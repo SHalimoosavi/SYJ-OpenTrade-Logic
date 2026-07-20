@@ -4,77 +4,106 @@ An open-source, deterministic HTS classification engine — the first building
 block toward a full trade-compliance platform. By **Sayanjali Nexus Private
 Limited**.
 
-> **Honesty note on scope (read this first):** the original spec for this
-> project described a full enterprise SaaS platform (FastAPI + PostgreSQL +
-> Redis + Celery + Next.js + a vector database + CI/CD + Docker). This
-> release, **v0.1.0**, delivers the one component that can be fully real,
-> fully tested, and dependency-free right now: the **GRI classification
-> engine**. Everything else is laid out below as an honest roadmap, not
-> pretend-finished code. No placeholders were shipped in what *is* here —
-> every function in this release runs and is covered by a passing test.
+# SYJ OpenTrade Logic
 
-## What's actually in v0.1.0
+An open-source, deterministic HTS classification engine with a REST API —
+building block toward a full trade-compliance platform. By **Sayanjali
+Nexus Private Limited**.
 
-- **`core/models.py`** — typed dataclasses for the HTS tree, decision steps,
-  and classification results.
-- **`core/gri_engine.py`** — a Directed-Acyclic-Graph classification engine
-  that applies **GRI 1** (heading terms + legal notes) and **GRI 6**
-  (subheading comparison), with **GRI 3(a)** specificity tie-break flagging.
-  Every classification returns a full, auditable **decision path**,
-  **alternatives considered**, **confidence score**, and **supporting legal
-  notes** — no black-box output.
-- **`data/hts_sample.json`** — a small sample HTS tree (laptops, t-shirts,
-  drills, phones/routers) to demonstrate real traversal. This is a
-  demonstration dataset, not the full HTS schedule.
-- **`cli/classify.py`** — a zero-dependency command-line interface.
-- **`tests/test_gri_engine.py`** — 12 real unit tests, all passing, covering
-  correct classification, refusal-to-guess on unmatched products, and
-  decision-path integrity.
+> **Honesty note on scope:** the original spec described a full enterprise
+> SaaS platform (FastAPI + PostgreSQL + Redis + Celery + Next.js + a vector
+> database). This sandbox has no network access, so packages like FastAPI,
+> SQLAlchemy, and uvicorn can't be installed here. What's shipped below is
+> real, running, and tested against a live server and a real SQLite file on
+> disk — nothing is described-but-not-executed.
 
-Zero third-party dependencies. Runs on plain Python 3 — including under
-Termux on Android, matching how you build everything else.
+## v0.2.0 — REST API + SQLite persistence (new)
 
-## Quick start
+- **`server/app.py`** — a REST API server built on Python's stdlib
+  `http.server` (since FastAPI can't be installed in this sandbox). Every
+  route's docstring notes the equivalent FastAPI decorator, so porting this
+  to real FastAPI later is close to copy-paste.
+- **`server/db.py`** — SQLite persistence layer (stdlib `sqlite3`) storing
+  every classification as an auditable history record.
+- **`server/openapi_spec.py`** — hand-written OpenAPI 3.0 document, served
+  live at `GET /openapi.json`.
+- **`tests/test_api.py`** — 10 integration tests that start a **real**
+  server on a real TCP socket (via `threading` + `build_server(port=0)`)
+  and issue real HTTP requests with `urllib`, including one test that
+  bypasses the API entirely and reads the SQLite file directly to prove
+  persistence isn't mocked.
+
+**Routes:**
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/health` | liveness check |
+| POST | `/classify` | classify a product description, persist it |
+| GET | `/classifications?limit=&offset=` | paginated history |
+| GET | `/classifications/{id}` | fetch one record |
+| DELETE | `/classifications/{id}` | delete one record |
+| GET | `/openapi.json` | live OpenAPI 3.0 spec |
+
+### Run the server for real
 
 ```bash
-python3 -m unittest tests.test_gri_engine -v      # run the test suite
-python3 cli/classify.py "cordless electric drill"  # human-readable output
-python3 cli/classify.py "cotton t-shirt" --json     # JSON output
+python3 server/app.py --port 8000 --db syj_opentrade.db
+# then, in another terminal:
+curl -X POST http://localhost:8000/classify \
+  -H "Content-Type: application/json" \
+  -d '{"description":"cordless electric drill"}'
 ```
+
+### Run all tests (unit + live HTTP integration)
+
+```bash
+python3 -m unittest tests.test_gri_engine tests.test_api -v
+# 22 tests, all passing: 12 unit tests on the GRI engine,
+# 10 integration tests against a real running server.
+```
+
+## v0.1.0 — GRI classification engine
+
+- **`core/models.py`** — typed dataclasses for the HTS tree, decision
+  steps, and classification results.
+- **`core/gri_engine.py`** — DAG traversal applying **GRI 1** (heading
+  terms + legal notes), **GRI 6** (subheading comparison), and **GRI 3(a)**
+  specificity tie-break flagging. Every result includes a full decision
+  path, alternatives considered, confidence score, and supporting legal
+  notes — no black-box output.
+- **`data/hts_sample.json`** — sample HTS tree (laptops, t-shirts, drills,
+  phones/routers) for demonstration. Not the full HTS schedule.
+- **`cli/classify.py`** — zero-dependency CLI.
+
+Zero third-party dependencies anywhere in this repo. Runs on plain Python 3
+— including under Termux on Android.
 
 ## Why deterministic, not AI-first
 
-Per the original design brief: AI should *assist* (cleaning descriptions,
-extracting attributes, summarizing rulings) but must **never** replace
-deterministic GRI-based classification. This engine follows that principle
-strictly — classification is lexical/rule-based graph traversal, and every
-step is explainable. An AI layer can be added on top later as a *suggestion*
-source that still has to pass through this engine, never around it.
+AI should *assist* (cleaning descriptions, extracting attributes,
+summarizing rulings) but must **never** replace deterministic GRI-based
+classification. This engine follows that strictly — classification is
+lexical/rule-based graph traversal, and every step is explainable.
 
-## Honest roadmap (not yet built)
+## Honest roadmap
 
-These are correctly scoped as **future releases**, each requiring
-infrastructure this sandbox doesn't have (network access, a running
-Postgres/Redis, an npm registry):
-
-| Release | Scope | Needs |
+| Release | Scope | Status |
 |---|---|---|
-| v0.1.0 | GRI classification engine (this release) | ✅ done, tested |
-| v0.2.0 | FastAPI REST wrapper + SQLite persistence + classification history | `pip install fastapi sqlalchemy uvicorn` |
-| v0.3.0 | Full HTS dataset (all 99 chapters) replacing the sample dataset | USITC HTS data import |
-| v0.4.0 | Auth (JWT/RBAC), organizations, product catalog, CSV/Excel import | Postgres |
-| v0.5.0 | Next.js/React dashboard (shadcn/Tailwind) | Node + npm registry access |
-| v0.6.0 | Semantic search over CBP CROSS rulings (vector DB) | Pinecone/Milvus + embeddings API |
-| v0.7.0 | Duty calculator, Section 301/232/122, AD/CVD tariff library | Tariff data sources |
+| v0.1.0 | GRI classification engine | ✅ done, 12 tests passing |
+| v0.2.0 | REST API + SQLite persistence + history | ✅ done, 22 tests passing (this release) |
+| v0.3.0 | Port stdlib server to real FastAPI + SQLAlchemy; full HTS dataset (all 99 chapters) | needs `pip` access |
+| v0.4.0 | Auth (JWT/RBAC), organizations, product catalog, CSV/Excel import | needs Postgres |
+| v0.5.0 | Next.js/React dashboard (shadcn/Tailwind) | needs `npm` registry access |
+| v0.6.0 | Semantic search over CBP CROSS rulings (vector DB) | needs Pinecone/Milvus + embeddings API |
+| v0.7.0 | Duty calculator, Section 301/232/122, AD/CVD tariff library | needs tariff data sources |
 | v0.8.0 | Reports (PDF/CSV/Excel), audit trails, webhooks | — |
 | v0.9.0 | Docker/Compose, GitHub Actions CI/CD, deployment docs | — |
 
-**Recommended next step:** move this repo to your GitHub
-(`SHalimoosavi`) from a machine/environment with `pip` and `npm` access, and
-I can help you build v0.2.0 (the FastAPI + SQLite layer) directly against a
-real running server so it's genuinely tested end-to-end rather than just
-described.
+**Recommended next step:** push this repo to GitHub (`SHalimoosavi`), then
+from a machine with `pip`/`npm` access we can port `server/app.py` to real
+FastAPI + SQLAlchemy line-by-line and stand up the full stack.
 
 ## License
 
 Apache 2.0 — see `LICENSE`.
+
