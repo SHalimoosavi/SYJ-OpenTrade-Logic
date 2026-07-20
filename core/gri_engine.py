@@ -65,6 +65,27 @@ def _score_node(tokens: List[str], node: HTSNode) -> float:
     return min(base + bonus, 1.0)
 
 
+def _effective_heading_score(tokens: List[str], heading: HTSNode) -> float:
+    """
+    Score a heading for GRI 1 ranking purposes. Real HTS heading text is
+    often terse legal language (e.g. "Automatic data processing machines
+    and units thereof") that doesn't contain the everyday product words a
+    user actually types ("laptop"). Those words usually live at the
+    subheading level. So a heading's effective score is the BETTER of:
+      (a) its own description/keyword match, or
+      (b) the best match among its direct subheadings.
+    This keeps GRI 1 meaningful (we still rank and select a heading first)
+    while not penalizing headings whose subheadings are more specific than
+    the heading text itself -- which is normal, not an edge case, once you
+    load the real 99-chapter dataset instead of hand-curated sample data.
+    """
+    own_score = _score_node(tokens, heading)
+    if not heading.children:
+        return own_score
+    best_child_score = max((_score_node(tokens, c) for c in heading.children), default=0.0)
+    return max(own_score, best_child_score)
+
+
 class GRIEngine:
     def __init__(self, hts_data_path: str):
         with open(hts_data_path, "r", encoding="utf-8") as f:
@@ -113,7 +134,7 @@ class GRIEngine:
         # ---- Step 1 (GRI 1): score every heading in the DAG ----
         heading_scores: List[Tuple[float, HTSNode, HTSNode]] = []
         for chapter, heading in self._all_headings():
-            score = _score_node(tokens, heading)
+            score = _effective_heading_score(tokens, heading)
             heading_scores.append((score, chapter, heading))
 
         heading_scores.sort(key=lambda x: x[0], reverse=True)

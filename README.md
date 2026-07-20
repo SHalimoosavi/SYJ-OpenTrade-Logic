@@ -10,6 +10,73 @@ An open-source, deterministic HTS classification engine with a REST API —
 building block toward a full trade-compliance platform. By **Sayanjali
 Nexus Private Limited**.
 
+## v0.3.0 — real FastAPI + SQLAlchemy, and the full 99-chapter HTS dataset
+
+> **What's genuinely new vs. described-but-untested:** the FastAPI/SQLAlchemy
+> code below is a careful route-for-route port of the v0.2.0 stdlib server,
+> and I proved its core fix (heading-scoring against terse real HTS legal
+> text) against a realistic fixture, with a permanent regression test. But
+> `pip install fastapi` and the live USITC data pull both require real
+> internet access that this sandbox doesn't have — **you need to run the
+> commands below yourself**, ideally with me watching the output so we can
+> fix anything that doesn't match on the first try.
+
+### Step 1 — install real dependencies (on your Termux/dev machine)
+
+```bash
+cd syj-opentrade-logic
+pip install -r server_fastapi/requirements.txt --break-system-packages
+pip install httpx --break-system-packages   # needed for FastAPI's TestClient
+```
+
+### Step 2 — pull the real, full HTS dataset (chapters 01–99)
+
+```bash
+python3 scripts/import_hts_data.py
+```
+
+This hits the **official USITC REST API**
+(`https://hts.usitc.gov/reststop/exportList?from=0101&to=9999&format=JSON&styles=false`,
+confirmed from USITC's own published "HTS System User Guide"), pulls all
+~17,000+ live HTS-10 line items, and writes `data/hts_full.json` in the
+tree shape the engine expects.
+
+**Important:** the script prints the raw JSON field names of the first
+record before parsing anything, and warns loudly if it parses fewer than 90
+chapters. If either of those looks wrong, stop and paste the output back to
+me here — the USITC API's field names have shifted before, and I'd rather
+fix the parser with you than have it silently produce a broken dataset.
+
+### Step 3 — run the tests (now against the real stack)
+
+```bash
+python3 -m unittest tests.test_gri_engine tests.test_api tests.test_importer_and_terse_headings -v
+python3 -m unittest server_fastapi.test_main -v
+```
+
+### Step 4 — run the real server
+
+```bash
+python3 -m uvicorn server_fastapi.main:app --reload --port 8000
+```
+
+Then open `http://localhost:8000/docs` — that's a **real, auto-generated
+Swagger UI** (FastAPI does this for free; `server/openapi_spec.py` from
+v0.2.0 is now obsolete). Try `/classify` against real product descriptions
+and watch it hit the full dataset.
+
+### What changed under the hood (fixed while building this)
+
+Real HTS heading text is terse legal language ("Automatic data processing
+machines and units thereof") that usually doesn't contain the everyday
+words people type ("laptop"). Those live at the subheading level. The v0.1
+engine only matched at the heading level before descending, so it silently
+returned "unresolved" for perfectly classifiable products once real data
+replaced the hand-curated sample. Fixed in `core/gri_engine.py`
+(`_effective_heading_score`) and covered by
+`tests/test_importer_and_terse_headings.py`.
+
+---
 > **Honesty note on scope:** the original spec described a full enterprise
 > SaaS platform (FastAPI + PostgreSQL + Redis + Celery + Next.js + a vector
 > database). This sandbox has no network access, so packages like FastAPI,
@@ -90,8 +157,8 @@ lexical/rule-based graph traversal, and every step is explainable.
 | Release | Scope | Status |
 |---|---|---|
 | v0.1.0 | GRI classification engine | ✅ done, 12 tests passing |
-| v0.2.0 | REST API + SQLite persistence + history | ✅ done, 22 tests passing (this release) |
-| v0.3.0 | Port stdlib server to real FastAPI + SQLAlchemy; full HTS dataset (all 99 chapters) | needs `pip` access |
+| v0.2.0 | stdlib REST API + SQLite persistence + history | ✅ done, 22 tests passing |
+| v0.3.0 | Real FastAPI + SQLAlchemy port; full 99-chapter HTS import script | ✅ code + logic proven on fixtures (25 tests passing here); **you run `pip install` + the importer on your machine** to activate against the live dataset |
 | v0.4.0 | Auth (JWT/RBAC), organizations, product catalog, CSV/Excel import | needs Postgres |
 | v0.5.0 | Next.js/React dashboard (shadcn/Tailwind) | needs `npm` registry access |
 | v0.6.0 | Semantic search over CBP CROSS rulings (vector DB) | needs Pinecone/Milvus + embeddings API |
