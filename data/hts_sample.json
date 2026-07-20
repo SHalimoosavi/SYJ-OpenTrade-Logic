@@ -1,0 +1,139 @@
+{
+  "chapters": [
+    {
+      "code": "84",
+      "description": "Nuclear reactors, boilers, machinery and mechanical appliances",
+      "level": "chapter",
+      "keywords": ["machine", "machinery", "mechanical", "appliance", "computer", "processing"],
+      "legal_notes": ["This chapter does not cover articles of Chapter 85 that are electrical in nature and specifically provided for elsewhere."],
+      "children": [
+        {
+          "code": "8471",
+          "description": "Automatic data processing machines and units thereof",
+          "level": "heading",
+          "keywords": ["computer", "laptop", "processor", "data processing", "cpu", "server"],
+          "legal_notes": ["Heading 8471 covers machines that store and process data via a program, are freely programmable, and perform computation."],
+          "children": [
+            {
+              "code": "8471.30",
+              "description": "Portable automatic data processing machines, weighing not more than 10 kg, laptops/notebooks/sub-notebooks",
+              "level": "subheading",
+              "keywords": ["laptop", "notebook", "portable computer", "sub-notebook"],
+              "duty_rate": "Free",
+              "children": []
+            },
+            {
+              "code": "8471.41",
+              "description": "Other automatic data processing machines comprising a CPU and input/output unit combined",
+              "level": "subheading",
+              "keywords": ["desktop", "all-in-one computer", "workstation"],
+              "duty_rate": "Free",
+              "children": []
+            },
+            {
+              "code": "8471.50",
+              "description": "Processing units other than those of subheading 8471.41 or 8471.49",
+              "level": "subheading",
+              "keywords": ["processor unit", "cpu module", "bare processing unit"],
+              "duty_rate": "Free",
+              "children": []
+            }
+          ]
+        },
+        {
+          "code": "8467",
+          "description": "Tools for working in the hand, pneumatic, hydraulic or with self-contained motor",
+          "level": "heading",
+          "keywords": ["power tool", "drill", "hand tool", "pneumatic tool", "cordless"],
+          "legal_notes": [],
+          "children": [
+            {
+              "code": "8467.21",
+              "description": "Drills of all kinds, hand-held, electric motor",
+              "level": "subheading",
+              "keywords": ["drill", "cordless drill", "electric drill"],
+              "duty_rate": "1.7%",
+              "children": []
+            },
+            {
+              "code": "8467.29",
+              "description": "Other hand tools with self-contained electric motor",
+              "level": "subheading",
+              "keywords": ["electric hand tool", "power tool other"],
+              "duty_rate": "1.7%",
+              "children": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "61",
+      "description": "Articles of apparel and clothing accessories, knitted or crocheted",
+      "level": "chapter",
+      "keywords": ["apparel", "clothing", "knit", "crochet", "garment"],
+      "legal_notes": ["This chapter applies only to made-up knitted or crocheted articles."],
+      "children": [
+        {
+          "code": "6109",
+          "description": "T-shirts, singlets and other vests, knitted or crocheted",
+          "level": "heading",
+          "keywords": ["t-shirt", "tshirt", "singlet", "vest", "tee"],
+          "legal_notes": [],
+          "children": [
+            {
+              "code": "6109.10",
+              "description": "T-shirts, singlets, of cotton",
+              "level": "subheading",
+              "keywords": ["cotton t-shirt", "cotton tee"],
+              "duty_rate": "16.5%",
+              "children": []
+            },
+            {
+              "code": "6109.90",
+              "description": "T-shirts, singlets, of other textile materials",
+              "level": "subheading",
+              "keywords": ["polyester t-shirt", "synthetic tee", "blend t-shirt"],
+              "duty_rate": "32%",
+              "children": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "85",
+      "description": "Electrical machinery and equipment and parts thereof",
+      "level": "chapter",
+      "keywords": ["electrical", "electronic", "battery", "wiring", "circuit"],
+      "legal_notes": [],
+      "children": [
+        {
+          "code": "8517",
+          "description": "Telephone sets, including smartphones, and other apparatus for transmission or reception of voice, images or other data, including apparatus for communication in a wired or wireless network",
+          "level": "heading",
+          "keywords": ["phone", "smartphone", "mobile phone", "cellular", "telephone", "router", "modem", "network", "wifi", "wireless", "transmission", "reception"],
+          "legal_notes": [],
+          "children": [
+            {
+              "code": "8517.13",
+              "description": "Smartphones",
+              "level": "subheading",
+              "keywords": ["smartphone", "iphone", "android phone"],
+              "duty_rate": "Free",
+              "children": []
+            },
+            {
+              "code": "8517.62",
+              "description": "Machines for reception, conversion and transmission of voice/data (routers, modems)",
+              "level": "subheading",
+              "keywords": ["router", "modem", "network switch", "access point"],
+              "duty_rate": "Free",
+              "children": []
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
