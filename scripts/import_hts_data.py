@@ -6,48 +6,21 @@ Pulls the REAL, current, full Harmonized Tariff Schedule (chapters 01-99,
 ~17,000+ line items) from the official USITC REST API and converts it into
 the nested chapter -> heading -> subheading JSON tree our GRIEngine expects
 (same shape as data/hts_sample.json).
-
-Official endpoint (confirmed from USITC's own "Harmonized Tariff Schedule
-System User Guide", RESTful API section, base URL https://hts.usitc.gov/reststop):
-
-    GET https://hts.usitc.gov/reststop/exportList
-        ?from=0101&to=9999&format=JSON&styles=false
-
-This MUST be run on a machine with real internet access -- it will not run
-in a network-isolated sandbox. Run it on your Termux/dev machine:
-
-    pip install requests --break-system-packages
-    python3 scripts/import_hts_data.py
-
-Output: data/hts_full.json
-
-IMPORTANT -- run this with me watching the output the first time. The USITC
-API's exact JSON field names have shifted between versions of their system
-in the past (htsno/description/general/special/indent are the documented
-fields as of the last time this was checked), so this script prints the raw
-keys of the first record before doing anything else. If the printed keys
-don't match FIELD NAMES below, stop and tell me what it printed so I can
-adjust the parser with you rather than silently producing a broken dataset.
 """
 
 import json
 import os
 import sys
-import time
 import urllib.request
 import urllib.error
 
 EXPORT_URL = "https://hts.usitc.gov/reststop/exportList?from=0101&to=9999&format=JSON&styles=false"
 OUTPUT_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "hts_full.json")
 
-# Documented field names per the USITC HTS user guide / observed API usage.
-# If the printed sample record doesn't have these, the script will tell you
-# and stop rather than guessing.
 FIELD_HTSNO = "htsno"
 FIELD_DESCRIPTION = "description"
 FIELD_INDENT = "indent"
 FIELD_GENERAL = "general"
-FIELD_SPECIAL = "special"
 FIELD_UNITS = "units"
 
 
@@ -60,97 +33,101 @@ def fetch_raw_hts() -> list:
             raw_bytes = resp.read()
     except urllib.error.URLError as e:
         print(f"ERROR: could not reach the USITC API: {e}")
-        print("Check your internet connection. If this persists, the USITC endpoint")
-        print("may be temporarily down (they do post maintenance windows) -- retry later.")
         sys.exit(1)
 
     data = json.loads(raw_bytes)
     if isinstance(data, dict) and "results" in data:
         data = data["results"]
     if not isinstance(data, list) or not data:
-        print("ERROR: unexpected response shape from USITC API. Got:")
-        print(json.dumps(data, indent=2)[:2000])
+        print("ERROR: unexpected response shape from USITC API.")
         sys.exit(1)
 
     print(f"Fetched {len(data)} raw records.\n")
-    print("First record's keys (verify these match FIELD_* constants at the top of this script):")
+    print("First record's keys:")
     print(f"  {sorted(data[0].keys())}\n")
     return data
 
 
-def to_int_indent(raw_indent) -> int:
+def _safe_int(raw_value, default: int = 0) -> int:
     try:
-        return int(raw_indent)
+        return int(raw_value)
     except (TypeError, ValueError):
-        return 0
+        return default
 
 
 def build_tree(raw_records: list) -> dict:
     """
     Convert the USITC flat, indent-based record list into our nested
-    chapter -> heading -> subheading tree.
+    chapter -> heading -> subheading tree, respecting the real nesting
+    depth encoded in the `indent` field.
 
-    Strategy:
-      - A record is a CHAPTER root if its htsno is a bare 2-digit code (e.g. "84").
-      - A record is a HEADING if its htsno is a 4-digit code with no dot (e.g. "8471"),
-        or the first dotted segment when a 6/8/10-digit code appears without an
-        explicit 4-digit heading row (some exports only emit dotted codes).
-      - Everything else nests as a SUBHEADING under the most recently seen heading
-        within the current chapter, using `indent` to track nesting depth for
-        the un-numbered "descriptive" rows HTS uses (e.g. "Live animals:" with
-        indented sub-rows below it that inherit the parent's classification code
-        until a new htsno appears).
-      - Rows with an empty description and empty htsno are separator rows and
-        are skipped.
+    Chapter membership is derived from each heading/subheading's OWN code
+    prefix, not from waiting for a dedicated 2-digit chapter row (the real
+    feed emits very few of those).
+
+    Loose grouping rows ("Other:", "Women's or girls':", "Of cotton:") are
+    tracked on an indent-keyed stack so their text only attaches to the
+    specific branch nested beneath them -- not the whole heading.
+
+    Chapter 99 entries with no real 4-digit heading parent get a
+    synthesized placeholder heading (marked so GRIEngine can deprioritize
+    it), rather than being misread as a real heading.
     """
+    chapter_titles = {}
+    for rec in raw_records:
+        htsno = (rec.get(FIELD_HTSNO) or "").strip()
+        description = (rec.get(FIELD_DESCRIPTION) or "").strip()
+        digits_only = htsno.replace(".", "")
+        if htsno and len(digits_only) == 2 and digits_only.isdigit() and description:
+            chapter_titles.setdefault(digits_only, description)
+
     chapters_by_code = {}
     chapters_order = []
     current_chapter = None
     current_heading = None
+    context_stack = []
+
+    def get_or_create_chapter(chap_code: str) -> dict:
+        nonlocal current_chapter
+        if chap_code not in chapters_by_code:
+            chapters_by_code[chap_code] = {
+                "code": chap_code,
+                "description": chapter_titles.get(chap_code, f"Chapter {chap_code}"),
+                "level": "chapter",
+                "keywords": [],
+                "legal_notes": [],
+                "children": [],
+            }
+            chapters_order.append(chap_code)
+        current_chapter = chapters_by_code[chap_code]
+        return current_chapter
+
+    def context_chain_text(indent: int) -> list:
+        return [text for (lvl, text) in context_stack if lvl < indent]
 
     for rec in raw_records:
         htsno = (rec.get(FIELD_HTSNO) or "").strip()
         description = (rec.get(FIELD_DESCRIPTION) or "").strip()
         general = (rec.get(FIELD_GENERAL) or "").strip() or None
         units = rec.get(FIELD_UNITS) or []
+        indent = _safe_int(rec.get(FIELD_INDENT), default=0)
 
         if not description:
-            continue  # skip pure separator/blank rows
+            continue
 
         digits_only = htsno.replace(".", "")
 
-        # Chapter root: exactly 2 digits, e.g. "84"
         if htsno and len(digits_only) == 2 and digits_only.isdigit():
-            current_chapter = {
-                "code": digits_only,
-                "description": description,
-                "level": "chapter",
-                "keywords": [],
-                "legal_notes": [],
-                "children": [],
-            }
-            chapters_by_code[digits_only] = current_chapter
-            chapters_order.append(digits_only)
+            get_or_create_chapter(digits_only)
+            current_chapter["description"] = description
             current_heading = None
+            context_stack = []
             continue
 
-        # Heading: exactly 4 digits, e.g. "8471"
         if htsno and len(digits_only) == 4 and digits_only.isdigit():
-            if current_chapter is None:
-                # Defensive: some export ranges may start mid-chapter; synthesize
-                # a chapter root from the heading's first 2 digits.
-                chap_code = digits_only[:2]
-                current_chapter = chapters_by_code.get(chap_code) or {
-                    "code": chap_code,
-                    "description": f"Chapter {chap_code}",
-                    "level": "chapter",
-                    "keywords": [],
-                    "legal_notes": [],
-                    "children": [],
-                }
-                chapters_by_code[chap_code] = current_chapter
-                if chap_code not in chapters_order:
-                    chapters_order.append(chap_code)
+            chap_code = digits_only[:2]
+            if current_chapter is None or current_chapter["code"] != chap_code:
+                get_or_create_chapter(chap_code)
 
             current_heading = {
                 "code": htsno,
@@ -162,32 +139,49 @@ def build_tree(raw_records: list) -> dict:
                 "duty_rate": general,
             }
             current_chapter["children"].append(current_heading)
+            context_stack = []
             continue
 
-        # Everything with a real htsno deeper than 4 digits (6/8/10-digit) is a subheading
-        if htsno and current_heading is not None:
-            current_heading["children"].append(
-                {
-                    "code": htsno,
-                    "description": description,
-                    "level": "subheading",
+        if htsno and len(digits_only) > 4:
+            chap_code = digits_only[:2]
+            if current_chapter is None or current_chapter["code"] != chap_code:
+                get_or_create_chapter(chap_code)
+                current_heading = None
+                context_stack = []
+
+            if current_heading is None or current_heading["code"] != digits_only[:4]:
+                synthetic_code = digits_only[:4] if len(digits_only) >= 4 else chap_code
+                current_heading = {
+                    "code": synthetic_code,
+                    "description": f"[Ungrouped entries under chapter {chap_code}]",
+                    "level": "heading",
                     "keywords": [],
                     "legal_notes": [],
                     "children": [],
-                    "duty_rate": general,
-                    "units": units,
+                    "duty_rate": None,
                 }
-            )
+                current_chapter["children"].append(current_heading)
+                context_stack = []
+
+            ancestor_text = context_chain_text(indent)
+
+            subheading_node = {
+                "code": htsno,
+                "description": description,
+                "level": "subheading",
+                "keywords": ancestor_text,
+                "legal_notes": [],
+                "children": [],
+                "duty_rate": general,
+                "units": units,
+            }
+            current_heading["children"].append(subheading_node)
+            context_stack = [(lvl, t) for (lvl, t) in context_stack if lvl < indent]
+            context_stack.append((indent, description))
             continue
 
-        # Rows with NO htsno (pure descriptive text, e.g. "Live animals:") but
-        # a current heading in progress: fold their words into the heading's
-        # own description/keywords so they still contribute to lexical matching,
-        # since the GRI engine scores off description + keyword text.
-        if current_heading is not None:
-            current_heading["keywords"].append(description)
-        elif current_chapter is not None:
-            current_chapter["keywords"].append(description)
+        context_stack = [(lvl, t) for (lvl, t) in context_stack if lvl < indent]
+        context_stack.append((indent, description))
 
     return {"chapters": [chapters_by_code[c] for c in chapters_order]}
 
@@ -203,19 +197,13 @@ def main():
     print(f"Built tree: {n_chapters} chapters, {n_headings} headings, {n_subheadings} subheadings.")
 
     if n_chapters < 90:
-        print("\nWARNING: fewer than 90 chapters were parsed. This usually means the")
-        print("field-name assumptions in this script (FIELD_HTSNO etc.) don't match")
-        print("what the live API actually returned. Re-check the printed key list above")
-        print("and let's fix the parser together before trusting this output.\n")
+        print("\nWARNING: fewer than 90 chapters were parsed.\n")
 
     os.makedirs(os.path.dirname(OUTPUT_PATH), exist_ok=True)
     with open(OUTPUT_PATH, "w", encoding="utf-8") as f:
         json.dump(tree, f, indent=2)
 
     print(f"\nWrote full HTS dataset to: {OUTPUT_PATH}")
-    print("Next: point the server at it (it's the default path in server_fastapi/main.py)")
-    print("and restart uvicorn, or run:")
-    print("  python3 -m unittest tests.test_gri_engine -v  # sanity check the engine still passes")
 
 
 if __name__ == "__main__":

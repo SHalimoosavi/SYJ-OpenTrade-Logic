@@ -35,8 +35,31 @@ from core.models import (
 )
 
 
+def _stem(word: str) -> str:
+    """
+    Lightweight suffix-stripping normalizer -- NOT a real linguistic
+    stemmer, just enough to match plural/singular HTS legal text against
+    everyday singular product words. e.g. HTS says "Drills of all kinds";
+    a user types "drill". Without this, those never match as the same
+    token, which was found to cause real misclassification (see
+    scripts/import_hts_data.py docstring, Chapter 99 bug).
+    """
+    if len(word) > 4 and word.endswith("ies"):
+        return word[:-3] + "y"
+    if len(word) > 4 and word.endswith("es"):
+        return word[:-2]
+    if len(word) > 3 and word.endswith("s") and not word.endswith("ss"):
+        return word[:-1]
+    return word
+
+
 def _tokenize(text: str) -> List[str]:
-    return [t for t in re.findall(r"[a-z0-9]+", text.lower()) if t]
+    raw = re.findall(r"[a-z0-9]+", text.lower())
+    return [_stem(t) for t in raw if t]
+
+
+SYNTHESIZED_HEADING_MARKER = "[Ungrouped entries under chapter"
+SYNTHESIZED_HEADING_PENALTY = 0.6  # de-prioritize structurally-incomplete headings on near-ties
 
 
 def _score_node(tokens: List[str], node: HTSNode) -> float:
@@ -81,9 +104,14 @@ def _effective_heading_score(tokens: List[str], heading: HTSNode) -> float:
     """
     own_score = _score_node(tokens, heading)
     if not heading.children:
-        return own_score
-    best_child_score = max((_score_node(tokens, c) for c in heading.children), default=0.0)
-    return max(own_score, best_child_score)
+        result = own_score
+    else:
+        best_child_score = max((_score_node(tokens, c) for c in heading.children), default=0.0)
+        result = max(own_score, best_child_score)
+
+    if heading.description.startswith(SYNTHESIZED_HEADING_MARKER):
+        result *= SYNTHESIZED_HEADING_PENALTY
+    return result
 
 
 class GRIEngine:
@@ -106,11 +134,16 @@ class GRIEngine:
         return node
 
     def _all_headings(self) -> List[Tuple[HTSNode, HTSNode]]:
-        """Return (chapter, heading) pairs across the whole DAG."""
+        """Return (chapter, heading) pairs across the whole DAG.
+        Defensively filters to level=='heading' only -- a malformed import
+        (e.g. a subheading/leaf node attached directly under a chapter due
+        to missing intermediate structure) must never be scored as if it
+        were a heading."""
         pairs = []
         for chapter in self.chapters:
             for heading in chapter.children:
-                pairs.append((chapter, heading))
+                if heading.level == "heading":
+                    pairs.append((chapter, heading))
         return pairs
 
     def classify(self, product_description: str) -> ClassificationResult:

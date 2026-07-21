@@ -61,5 +61,97 @@ class TestImporterAndTerseHeadingMatching(unittest.TestCase):
         self.assertEqual(result.final_code, "8471.41.00")
 
 
+class TestMultiChapterDetection(unittest.TestCase):
+    """
+    Regression test for a real bug found running import_hts_data.py against
+    the LIVE USITC feed on 2026-07-21: the real data emits very few bare
+    2-digit chapter rows (sometimes only one across 35,000+ records), so
+    chapter boundaries must be derived from each heading's own code prefix,
+    not from waiting for a dedicated chapter row.
+    """
+
+    def test_new_chapter_detected_even_without_a_bare_2digit_row(self):
+        fixture = [
+            {"htsno": "01", "description": "LIVE ANIMALS", "indent": "0", "general": "", "units": []},
+            {"htsno": "0101", "description": "Live horses, asses, mules", "indent": "1", "general": "", "units": []},
+            {"htsno": "0101.30.00", "description": "Asses", "indent": "2", "general": "6.8%", "units": ["No."]},
+            {"htsno": "8471", "description": "Automatic data processing machines", "indent": "1", "general": "", "units": []},
+            {"htsno": "8471.30.00", "description": "Portable ADP machines", "indent": "2", "general": "Free", "units": ["No."]},
+        ]
+        tree = build_tree(fixture)
+        codes = [c["code"] for c in tree["chapters"]]
+        self.assertEqual(codes, ["01", "84"])
+        self.assertEqual(tree["chapters"][1]["children"][0]["code"], "8471")
+
+
+class TestChapter99DoesNotOutrankRealHeadings(unittest.TestCase):
+    """
+    Regression test for a real bug found spot-checking v0.3.0 against the
+    LIVE USITC feed: "cordless electric drill" classified to a Chapter 99
+    special tariff provision instead of the correct heading 8467.21.00.
+    Fixed via _stem() normalization in core/gri_engine.py and a scoring
+    penalty for synthesized/structurally-incomplete headings.
+    """
+
+    def test_real_heading_wins_over_verbose_chapter99_entry(self):
+        fixture = [
+            {"htsno": "84", "description": "Nuclear reactors, boilers, machinery and mechanical appliances",
+             "indent": "0", "general": "", "units": []},
+            {"htsno": "8467", "description": "Tools for working in the hand, pneumatic, hydraulic or with self-contained motor",
+             "indent": "1", "general": "", "units": []},
+            {"htsno": "8467.21.00", "description": "Drills of all kinds, hand-held, electric motor",
+             "indent": "2", "general": "1.7%", "units": ["No."]},
+            {"htsno": "99", "description": "TEMPORARY MODIFICATIONS", "indent": "0", "general": "", "units": []},
+            {"htsno": "9902.15.81",
+             "description": ("Rotary drill, hammer and chiseling tools with self-contained electric motor "
+                              "(provided for in 8467.21.00), each with pneumatic hammering mechanism that "
+                              "engages with slotted drive drill-bits and an electromechanical mechanism"),
+             "indent": "1", "general": "Free", "units": ["No."]},
+        ]
+        tree = build_tree(fixture)
+        fd, path = tempfile.mkstemp(suffix=".json")
+        os.close(fd)
+        with open(path, "w") as f:
+            json.dump(tree, f)
+        try:
+            result = GRIEngine(path).classify("cordless electric drill")
+            self.assertEqual(result.final_code, "8467.21.00")
+        finally:
+            os.remove(path)
+
+
+class TestIndentNestingDoesNotLeakAcrossBranches(unittest.TestCase):
+    """
+    Regression test for a real bug found spot-checking v0.3.0 against the
+    LIVE USITC feed: "cotton t-shirt" classified to heading 6211 instead of
+    the correct heading 6109. Fixed with an indent-keyed context stack in
+    scripts/import_hts_data.py.
+    """
+
+    def test_cotton_context_does_not_leak_from_one_heading_to_a_sibling_heading(self):
+        fixture = [
+            {"htsno": "61", "description": "Articles of apparel, knitted or crocheted",
+             "indent": "0", "general": "", "units": []},
+            {"htsno": "6109", "description": "T-shirts, singlets and other vests, knitted or crocheted",
+             "indent": "1", "general": "", "units": []},
+            {"htsno": "6109.10.00", "description": "Of cotton", "indent": "2", "general": "16.5%", "units": ["doz."]},
+            {"htsno": "6211", "description": "Track suits, ski-suits and swimwear; other garments",
+             "indent": "1", "general": "", "units": []},
+            {"htsno": "", "description": "Other garments, women's or girls':", "indent": "2", "general": "", "units": []},
+            {"htsno": "", "description": "Of cotton:", "indent": "3", "general": "", "units": []},
+            {"htsno": "6211.42.00", "description": "Track suits", "indent": "4", "general": "8.1%", "units": ["No."]},
+        ]
+        tree = build_tree(fixture)
+        fd, path = tempfile.mkstemp(suffix=".json")
+        os.close(fd)
+        with open(path, "w") as f:
+            json.dump(tree, f)
+        try:
+            result = GRIEngine(path).classify("cotton t-shirt")
+            self.assertEqual(result.final_code, "6109.10.00")
+        finally:
+            os.remove(path)
+
+
 if __name__ == "__main__":
     unittest.main()
