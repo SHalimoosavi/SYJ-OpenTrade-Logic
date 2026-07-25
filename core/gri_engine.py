@@ -43,11 +43,25 @@ def _stem(word: str) -> str:
     a user types "drill". Without this, those never match as the same
     token, which was found to cause real misclassification (see
     scripts/import_hts_data.py docstring, Chapter 99 bug).
+
+    IMPORTANT (found via live spot-checking on real data): an earlier
+    version of this function also stripped trailing "es" as a special
+    case (for words like "boxes" -> "box"). That broke a much more common
+    and important class of words in trade/product vocabulary: nouns that
+    already end in a silent "e" before taking a plural "s" -- "phone" ->
+    "phones", "case" -> "cases", "code" -> "codes", "smartphone" ->
+    "smartphones". Stripping "es" from "smartphones" gave "smartphon"
+    (missing the final e), which silently failed to match the query word
+    "smartphone" and let a Chapter 99 phone-CASE special provision
+    outrank the real heading 8517 for phones. Given how common
+    silent-e-plus-s nouns are in this domain (phone, case, device,
+    machine, engine, cable, tube...) versus the sibilant-plural pattern
+    ("boxes", "watches") this rule was meant for, only stripping a single
+    trailing "s" is the safer default here -- even though it means a
+    word like "boxes" stems to "boxe" rather than "box".
     """
     if len(word) > 4 and word.endswith("ies"):
         return word[:-3] + "y"
-    if len(word) > 4 and word.endswith("es"):
-        return word[:-2]
     if len(word) > 3 and word.endswith("s") and not word.endswith("ss"):
         return word[:-1]
     return word

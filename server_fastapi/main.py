@@ -1,17 +1,18 @@
 """
-SYJ OpenTrade Logic - FastAPI server (v0.3.0)
+SYJ OpenTrade Logic - FastAPI server (v0.4.0)
 ================================================
-Real FastAPI + SQLAlchemy port of the v0.2.0 stdlib http.server (server/app.py).
-Route-for-route equivalent, same status codes, same response shapes -- so any
-client built against v0.2.0 keeps working.
+v0.3.0 added real FastAPI + SQLAlchemy + the full HTS dataset.
+v0.4.0 adds: JWT auth, organizations, RBAC users, and a product catalog
+with CSV/Excel import. The classification endpoints below remain
+unauthenticated on purpose -- they're the open, public-facing core of the
+project (classification is meant to be freely usable); auth is required
+only for organization-scoped resources (users, products).
 
 Run:
     pip install -r server_fastapi/requirements.txt
     python3 -m uvicorn server_fastapi.main:app --reload --port 8000
 
-Then open http://localhost:8000/docs for interactive Swagger UI (auto-generated
--- this is the "Swagger / OpenAPI documentation" requirement from the original
-spec, now free instead of hand-written).
+Then open http://localhost:8000/docs for interactive Swagger UI.
 """
 
 import json
@@ -34,6 +35,7 @@ from server_fastapi.schemas import (  # noqa: E402
     DeleteOut,
     HealthOut,
 )
+from server_fastapi import routes_auth, routes_catalog, routes_org  # noqa: E402
 
 DEFAULT_HTS_DATA = os.environ.get(
     "SYJ_HTS_DATA_PATH",
@@ -45,8 +47,8 @@ FALLBACK_HTS_DATA = os.path.join(
 
 app = FastAPI(
     title="SYJ OpenTrade Logic API",
-    version="0.3.0",
-    description="Deterministic, explainable HTS classification REST API.",
+    version="0.4.0",
+    description="Deterministic, explainable HTS classification REST API with organizations, RBAC, and a product catalog.",
 )
 
 app.add_middleware(
@@ -55,6 +57,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(routes_auth.router)
+app.include_router(routes_catalog.router)
+app.include_router(routes_org.router)
 
 # Load the full 99-chapter dataset if it exists (built by scripts/import_hts_data.py);
 # fall back to the small demo dataset from v0.1.0/v0.2.0 otherwise, so the server
@@ -74,7 +80,7 @@ def on_startup():
 
 @app.get("/health", response_model=HealthOut)
 def health():
-    return {"status": "ok", "service": "SYJ OpenTrade Logic", "version": "0.3.0"}
+    return {"status": "ok", "service": "SYJ OpenTrade Logic", "version": "0.4.0"}
 
 
 @app.post("/classify", response_model=ClassificationOut, status_code=201)

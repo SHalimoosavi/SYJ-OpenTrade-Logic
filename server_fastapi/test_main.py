@@ -22,15 +22,32 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 class TestFastAPIApp(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        # Use an isolated temp SQLite DB so tests don't touch your real dev database
-        cls.tmp_db_fd, cls.tmp_db_path = tempfile.mkstemp(suffix=".db")
+        # Termux's system /tmp is often read-only for regular processes --
+        # create the temp test DB inside the project directory instead.
+        local_tmp_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".test_tmp")
+        os.makedirs(local_tmp_dir, exist_ok=True)
+        cls.tmp_db_fd, cls.tmp_db_path = tempfile.mkstemp(suffix=".db", dir=local_tmp_dir)
         os.close(cls.tmp_db_fd)
         os.remove(cls.tmp_db_path)
         os.environ["SYJ_DATABASE_URL"] = f"sqlite:///{cls.tmp_db_path}"
 
+        # This test file should be deterministic regardless of whatever real
+        # HTS dataset (data/hts_full.json) happens to exist on this machine --
+        # explicitly point at the small demo dataset so hardcoded assertions
+        # below stay stable and this test's purpose (API mechanics, not HTS
+        # classification accuracy) stays decoupled from live data. Must be
+        # set BEFORE importing server_fastapi.main, since it loads the engine
+        # once at import time.
+        sample_data_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "hts_sample.json"
+        )
+        os.environ["SYJ_HTS_DATA_PATH"] = sample_data_path
+
         from fastapi.testclient import TestClient
+        from server_fastapi.database import init_db
         from server_fastapi.main import app
 
+        init_db()  # explicit -- don't rely on TestClient triggering @app.on_event("startup")
         cls.client = TestClient(app)
 
     @classmethod

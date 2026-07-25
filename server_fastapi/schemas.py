@@ -75,3 +75,113 @@ class HealthOut(BaseModel):
     status: str
     service: str
     version: str
+
+
+# ---------------------------------------------------------------------------
+# v0.4.0 - Auth, Organizations, Users, Product Catalog
+# ---------------------------------------------------------------------------
+
+class RegisterRequest(BaseModel):
+    """Registers a brand-new organization plus its first user (the owner)."""
+    organization_name: str = Field(..., min_length=1, max_length=200)
+    email: str = Field(..., min_length=3, max_length=255)
+    password: str = Field(..., min_length=8, max_length=128)
+    full_name: str = Field(..., min_length=1, max_length=200)
+
+
+class LoginRequest(BaseModel):
+    email: str = Field(..., min_length=3, max_length=255)
+    password: str = Field(..., min_length=1, max_length=128)
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+
+class TokenPairOut(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+
+
+class UserOut(BaseModel):
+    id: int
+    email: str
+    full_name: str
+    role: str
+    is_active: bool
+    organization_id: int
+
+    class Config:
+        from_attributes = True
+
+
+class OrganizationOut(BaseModel):
+    id: int
+    name: str
+    slug: str
+
+    class Config:
+        from_attributes = True
+
+
+class InviteUserRequest(BaseModel):
+    email: str = Field(..., min_length=3, max_length=255)
+    password: str = Field(..., min_length=8, max_length=128)
+    full_name: str = Field(..., min_length=1, max_length=200)
+    role: str = Field(default="member")
+
+
+class UpdateUserRoleRequest(BaseModel):
+    role: str
+
+
+class ProductCreateRequest(BaseModel):
+    sku: str = Field(..., min_length=1, max_length=100)
+    name: str = Field(..., min_length=1, max_length=300)
+    description: Optional[str] = None
+    hts_code: Optional[str] = None
+    duty_rate: Optional[str] = None
+
+
+class ProductUpdateRequest(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=300)
+    description: Optional[str] = None
+    hts_code: Optional[str] = None
+    duty_rate: Optional[str] = None
+
+
+class ProductOut(BaseModel):
+    id: int
+    sku: str
+    name: str
+    description: Optional[str]
+    hts_code: Optional[str]
+    duty_rate: Optional[str]
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ProductListOut(BaseModel):
+    count: int
+    limit: int
+    offset: int
+    results: List[ProductOut]
+
+
+class ImportRowResult(BaseModel):
+    row_number: int
+    sku: Optional[str]
+    status: str  # "created" | "updated" | "error"
+    error: Optional[str] = None
+
+
+class ImportSummaryOut(BaseModel):
+    total_rows: int
+    created: int
+    updated: int
+    errors: int
+    row_results: List[ImportRowResult]
