@@ -298,7 +298,7 @@ timeline
 | **v0.2.0** | stdlib REST API + SQLite persistence | ✅ Done — 22 tests passing |
 | **v0.3.0** | Real FastAPI + SQLAlchemy; full 99-chapter HTS import | ✅ Done — 26 tests passing, live against USITC data |
 | **v0.4.0** | Auth (JWT/RBAC), organizations, product catalog, CSV/Excel import | 🔜 Planned — needs Postgres |
-| **v0.5.0** | Next.js/React dashboard (shadcn/Tailwind) | 🔜 Planned — needs npm registry access |
+| **v0.5.0** | Vite+React dashboard (shadcn/Tailwind) — swapped from Next.js for Termux/mobile practicality | ✅ Code complete, import/export/syntax-verified by script; `npm install` + real run needed on your machine |
 | **v0.6.0** | Semantic search over CBP CROSS rulings (vector DB) | 🔜 Planned — needs Pinecone/Milvus + embeddings API |
 | **v0.7.0** | Duty calculator, Section 301/232/122, AD/CVD tariff library | 🔜 Planned — needs tariff data sources |
 | **v0.8.0** | Reports (PDF/CSV/Excel), audit trails, webhooks | 🔜 Planned |
