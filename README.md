@@ -299,7 +299,7 @@ timeline
 | **v0.3.0** | Real FastAPI + SQLAlchemy; full 99-chapter HTS import | ✅ Done — 26 tests passing, live against USITC data |
 | **v0.4.0** | Auth (JWT/RBAC), organizations, product catalog, CSV/Excel import | 🔜 Planned — needs Postgres |
 | **v0.5.0** | Vite+React dashboard (shadcn/Tailwind) — swapped from Next.js for Termux/mobile practicality | ✅ Code complete, import/export/syntax-verified by script; `npm install` + real run needed on your machine |
-| **v0.6.0** | Semantic search over CBP CROSS rulings (vector DB) | 🔜 Planned — needs Pinecone/Milvus + embeddings API |
+| **v0.6.0** | CROSS rulings search (BM25 lexical, zero-dependency) — swapped from Pinecone/Milvus+embeddings per explicit decision | ✅ Done — 15 new tests passing here; API integration tests need your machine |
 | **v0.7.0** | Duty calculator, Section 301/232/122, AD/CVD tariff library | 🔜 Planned — needs tariff data sources |
 | **v0.8.0** | Reports (PDF/CSV/Excel), audit trails, webhooks | 🔜 Planned |
 | **v0.9.0** | Docker/Compose, GitHub Actions CI/CD, deployment docs | 🔜 Planned |

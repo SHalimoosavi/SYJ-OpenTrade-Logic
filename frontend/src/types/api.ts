@@ -37,6 +37,18 @@ export interface AlternativeCode {
   reason_not_selected: string
 }
 
+export interface RelatedRuling {
+  id: string
+  url: string
+  date: string
+  title: string
+  hts_codes: string[]
+  gri_rules_cited: string[]
+  excerpt: string
+  score: number
+  matched_terms: string[]
+}
+
 export interface ClassificationResult {
   id?: number
   product_description: string
@@ -49,6 +61,7 @@ export interface ClassificationResult {
   decision_path: DecisionStep[]
   alternatives: AlternativeCode[]
   supporting_notes: string[]
+  related_rulings: RelatedRuling[]
 }
 
 export interface ClassificationHistoryItem {

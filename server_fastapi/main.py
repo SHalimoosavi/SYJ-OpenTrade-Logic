@@ -35,7 +35,7 @@ from server_fastapi.schemas import (  # noqa: E402
     DeleteOut,
     HealthOut,
 )
-from server_fastapi import routes_auth, routes_catalog, routes_org  # noqa: E402
+from server_fastapi import routes_auth, routes_catalog, routes_org, routes_rulings  # noqa: E402
 
 DEFAULT_HTS_DATA = os.environ.get(
     "SYJ_HTS_DATA_PATH",
@@ -61,6 +61,7 @@ app.add_middleware(
 app.include_router(routes_auth.router)
 app.include_router(routes_catalog.router)
 app.include_router(routes_org.router)
+app.include_router(routes_rulings.router)
 
 # Load the full 99-chapter dataset if it exists (built by scripts/import_hts_data.py);
 # fall back to the small demo dataset from v0.1.0/v0.2.0 otherwise, so the server
@@ -87,6 +88,39 @@ def health():
 def classify(req: ClassifyRequest, db: Session = Depends(get_db)):
     result = engine.classify(req.description)
     result_dict = result.to_dict()
+
+    # v0.6.0: surface related CROSS rulings as supporting precedent. This is
+    # the "AI assists, never overrides" principle in practice -- rulings are
+    # additional context for a human to review, not a second vote on the
+    # classification itself. Combine two signals: rulings whose text matches
+    # the product description lexically, and rulings tagged with the same
+    # HTS heading as the result, deduped, capped at 3.
+    text_matches = routes_rulings.rulings_index.search(req.description, top_k=3)
+    code_matches = routes_rulings.rulings_index.search_by_hts_prefix(result_dict.get("final_code"), top_k=3)
+
+    seen_ids = set()
+    related_rulings = []
+    for r in text_matches:
+        if r.ruling.id not in seen_ids:
+            seen_ids.add(r.ruling.id)
+            related_rulings.append(r.to_dict())
+    for ruling in code_matches:
+        if ruling.id not in seen_ids:
+            seen_ids.add(ruling.id)
+            related_rulings.append(
+                {
+                    "id": ruling.id,
+                    "url": ruling.url,
+                    "date": ruling.date,
+                    "title": ruling.title,
+                    "hts_codes": ruling.hts_codes,
+                    "gri_rules_cited": ruling.gri_rules_cited,
+                    "excerpt": ruling.full_text,
+                    "score": 0.0,
+                    "matched_terms": [],
+                }
+            )
+    result_dict["related_rulings"] = related_rulings[:3]
 
     record = ClassificationRecord(
         product_description=result_dict["product_description"],

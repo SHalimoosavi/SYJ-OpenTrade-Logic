@@ -30,6 +30,21 @@ class AlternativeCodeOut(BaseModel):
     reason_not_selected: str
 
 
+class RulingOut(BaseModel):
+    """A CROSS ruling surfaced as supporting precedent -- AI/search assists
+    by surfacing this, it never overrides the deterministic GRI engine's
+    own decision."""
+    id: str
+    url: str
+    date: str
+    title: str
+    hts_codes: List[str]
+    gri_rules_cited: List[str]
+    excerpt: str
+    score: float
+    matched_terms: List[str]
+
+
 class ClassificationOut(BaseModel):
     id: int
     product_description: str
@@ -42,6 +57,7 @@ class ClassificationOut(BaseModel):
     decision_path: List[DecisionStepOut]
     alternatives: List[AlternativeCodeOut]
     supporting_notes: List[str]
+    related_rulings: List[RulingOut] = []
 
 
 class ClassificationHistoryItem(BaseModel):
@@ -185,3 +201,13 @@ class ImportSummaryOut(BaseModel):
     updated: int
     errors: int
     row_results: List[ImportRowResult]
+
+
+# ---------------------------------------------------------------------------
+# v0.6.0 - CROSS Rulings Search (BM25, zero-dependency lexical search)
+# ---------------------------------------------------------------------------
+
+class RulingsSearchResponse(BaseModel):
+    query: str
+    count: int
+    results: List[RulingOut]

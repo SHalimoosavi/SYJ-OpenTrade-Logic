@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { Search, Loader2, CheckCircle2, XCircle, ChevronRight } from 'lucide-react'
+import { Search, Loader2, CheckCircle2, XCircle, ChevronRight, Scale } from 'lucide-react'
 import { classifyApi } from '@/lib/classify-api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -141,6 +141,44 @@ export function ClassifyPage() {
                     </li>
                   ))}
                 </ul>
+              </div>
+            )}
+
+            {result.related_rulings && result.related_rulings.length > 0 && (
+              <div>
+                <h3 className="mb-3 flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                  <Scale className="h-4 w-4" />
+                  Related CBP CROSS rulings
+                </h3>
+                <p className="mb-3 text-xs text-muted-foreground/70">
+                  Surfaced as supporting precedent for a human to review — never used to override the classification above.
+                </p>
+                <div className="space-y-2">
+                  {result.related_rulings.map((ruling) => (
+                    <a
+                      key={ruling.id}
+                      href={ruling.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block rounded-md border border-border p-3 text-sm transition-colors hover:bg-secondary/40"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono font-medium text-primary">{ruling.id}</span>
+                        <span className="text-xs text-muted-foreground">{ruling.date}</span>
+                      </div>
+                      <p className="mt-1 text-muted-foreground">{ruling.title}</p>
+                      {ruling.gri_rules_cited.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {ruling.gri_rules_cited.map((rule) => (
+                            <Badge key={rule} variant="outline" className="font-mono text-[10px]">
+                              {rule}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </a>
+                  ))}
+                </div>
               </div>
             )}
           </CardContent>
