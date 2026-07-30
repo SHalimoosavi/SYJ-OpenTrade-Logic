@@ -1,0 +1,66 @@
+{
+  "as_of_date": "2026-07-26",
+  "disclaimer": "These rates change frequently and are subject to executive orders, USTR actions, and exclusions that can take effect with little notice (e.g. Executive Order 14389 on 2026-02-20 ended certain IEEPA tariff actions). This table is a small, manually-curated, dated snapshot for demonstration and estimation purposes only -- it is NOT a substitute for checking the official CBP/USTR sources linked below, or consulting a licensed customs broker, before making any import compliance decision.",
+  "official_sources": [
+    "https://ustr.gov/issue-areas/enforcement/section-301-investigations",
+    "https://www.cbp.gov/trade/programs-administration/entry-summary/section-301-trade-remedies",
+    "https://hts.usitc.gov"
+  ],
+  "programs": [
+    {
+      "id": "section301-list1",
+      "program": "Section 301 - List 1",
+      "chapter99_code": "9903.88.01",
+      "legal_basis": "U.S. Note 20(a) to Subchapter III, Chapter 99, HTSUS",
+      "countries": ["CN"],
+      "additional_ad_valorem": 0.25,
+      "hts_prefixes": ["8471", "8517", "8481", "8482"],
+      "notes": "Originally implemented July 2018 against ~$34 billion of Chinese goods. Verify current status -- some products have since been granted exclusions.",
+      "source_url": "https://ustr.gov/issue-areas/enforcement/section-301-investigations/section-301-china/301-tariff-actions"
+    },
+    {
+      "id": "section301-list3",
+      "program": "Section 301 - List 3",
+      "chapter99_code": "9903.88.03",
+      "legal_basis": "U.S. Note 20(f) to Subchapter III, Chapter 99, HTSUS",
+      "countries": ["CN"],
+      "additional_ad_valorem": 0.25,
+      "hts_prefixes": ["6109", "6110", "6211", "4202"],
+      "notes": "Raised from 10% to 25% effective May 9, 2019. Verify current status.",
+      "source_url": "https://ustr.gov/issue-areas/enforcement/section-301-investigations/section-301-china/301-tariff-actions"
+    },
+    {
+      "id": "section301-list4a",
+      "program": "Section 301 - List 4A",
+      "chapter99_code": "9903.88.15",
+      "legal_basis": "U.S. Note 20(s) to Subchapter III, Chapter 99, HTSUS",
+      "countries": ["CN"],
+      "additional_ad_valorem": 0.075,
+      "hts_prefixes": ["8467", "6109"],
+      "notes": "Reduced from 15% to 7.5% effective February 14, 2020 as part of the US-China Phase One agreement. Covers roughly $120 billion of consumer goods. Verify current status.",
+      "source_url": "https://ustr.gov/issue-areas/enforcement/section-301-investigations/section-301-china/301-tariff-actions"
+    },
+    {
+      "id": "section232-steel",
+      "program": "Section 232 - Steel",
+      "chapter99_code": "9903.80.01",
+      "legal_basis": "Proclamation 9705, as amended",
+      "countries": ["*"],
+      "additional_ad_valorem": 0.25,
+      "hts_prefixes": ["7206", "7207", "7208", "7209", "7210", "7222"],
+      "notes": "Applies broadly to steel articles regardless of country of origin unless a specific country exemption or quota arrangement is in effect. Verify current status and any country-specific exemptions.",
+      "source_url": "https://www.cbp.gov/trade/programs-administration/trade-remedies/section-232-tariffs-aluminum-and-steel"
+    },
+    {
+      "id": "section232-aluminum",
+      "program": "Section 232 - Aluminum",
+      "chapter99_code": "9903.85.01",
+      "legal_basis": "Proclamation 9704, as amended",
+      "countries": ["*"],
+      "additional_ad_valorem": 0.10,
+      "hts_prefixes": ["7601", "7604", "7605", "7606", "7607"],
+      "notes": "Applies broadly to aluminum articles regardless of country of origin unless a specific country exemption or quota arrangement is in effect. Verify current status.",
+      "source_url": "https://www.cbp.gov/trade/programs-administration/trade-remedies/section-232-tariffs-aluminum-and-steel"
+    }
+  ]
+}

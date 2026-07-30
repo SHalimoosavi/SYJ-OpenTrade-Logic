@@ -1,0 +1,19 @@
+# Keep Docker builds consistent regardless of local Termux state --
+# e.g. data/hts_full.json might exist locally (from running the importer)
+# but should always be built fresh by docker-entrypoint.sh inside the
+# container, not accidentally baked into the image from a local checkout.
+data/hts_full.json
+.test_tmp/
+__pycache__/
+*.pyc
+*.db
+.git/
+.gitignore
+
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+
+.venv/
+venv/
+*.egg-info/

@@ -1,0 +1,16 @@
+# Test-only dependencies -- NOT needed to run the application, only to run
+# the test suite. Kept separate from requirements.txt so the Docker image
+# (and any production install) doesn't carry test tooling it'll never use.
+#
+# Install alongside requirements.txt when running tests:
+#   pip install -r server_fastapi/requirements.txt -r server_fastapi/requirements-dev.txt
+
+# Note: an earlier ad-hoc session hit a Starlette version that specifically
+# required a package called 'httpx2' (not standard 'httpx') for TestClient
+# support. That turned out to be environment-specific and not reproducible
+# here -- standard httpx has satisfied every test run since. Removed the
+# httpx2 pin since its real published versions (0.0.0, then 2.0.0+) didn't
+# match the range originally guessed here anyway. If you ever hit that
+# 'requires httpx2' error again, just: pip install httpx2 --break-system-packages
+httpx>=0.27,<1.0
+pypdf>=4.0,<6.0

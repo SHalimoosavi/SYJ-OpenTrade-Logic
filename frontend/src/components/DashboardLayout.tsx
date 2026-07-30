@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom'
-import { LayoutDashboard, Search, Package, Users, LogOut, Terminal } from 'lucide-react'
+import { LayoutDashboard, Search, Package, Users, LogOut, Terminal, Calculator, History, Webhook } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
 import { cn } from '@/lib/utils'
 import { roleAtLeast } from '@/types/api'
@@ -7,8 +7,11 @@ import { roleAtLeast } from '@/types/api'
 const navItems = [
   { to: '/', label: 'Overview', icon: LayoutDashboard, end: true },
   { to: '/classify', label: 'Classify', icon: Search },
+  { to: '/duty-calculator', label: 'Duty Calculator', icon: Calculator },
   { to: '/products', label: 'Product Catalog', icon: Package },
   { to: '/members', label: 'Members', icon: Users, minRole: 'viewer' as const },
+  { to: '/audit-log', label: 'Audit Log', icon: History, minRole: 'admin' as const },
+  { to: '/webhooks', label: 'Webhooks', icon: Webhook, minRole: 'admin' as const },
 ]
 
 export function DashboardLayout() {
@@ -21,7 +24,7 @@ export function DashboardLayout() {
           <Terminal className="h-5 w-5 text-primary" />
           <div>
             <p className="text-sm font-semibold leading-none">SYJ OpenTrade</p>
-            <p className="text-xs text-muted-foreground">Logic v0.5.0</p>
+            <p className="text-xs text-muted-foreground">Logic v0.8.0</p>
           </div>
         </div>
 

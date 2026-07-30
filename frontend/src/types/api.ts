@@ -109,6 +109,74 @@ export interface ImportSummary {
   row_results: ImportRowResult[]
 }
 
+export interface ProgramDuty {
+  program: string
+  chapter99_code: string
+  legal_basis: string
+  rate: number
+  amount: number
+  notes: string
+  source_url: string
+}
+
+export interface ADCVDFlag {
+  case_numbers: string[]
+  product_scope: string
+  countries: string[]
+  notes: string
+}
+
+export interface DutyCalculationResult {
+  hts_code: string
+  country_of_origin: string
+  declared_value: number
+  base_duty_rate: number | null
+  base_duty_amount: number | null
+  base_rate_raw: string | null
+  program_duties: ProgramDuty[]
+  adcvd_flags: ADCVDFlag[]
+  total_duty_rate: number | null
+  total_duty_amount: number | null
+  warnings: string[]
+  as_of_date: string
+  disclaimer: string
+}
+
+export interface AuditLogEntry {
+  id: number
+  user_email: string | null
+  action: string
+  resource_type: string
+  resource_id: string | null
+  details: Record<string, unknown> | null
+  created_at: string
+}
+
+export interface AuditLogListResponse {
+  count: number
+  limit: number
+  offset: number
+  results: AuditLogEntry[]
+}
+
+export interface Webhook {
+  id: number
+  url: string
+  event_types: string[]
+  is_active: boolean
+  created_at: string
+  secret?: string | null
+}
+
+export interface WebhookDelivery {
+  id: number
+  webhook_id: number
+  event_type: string
+  response_status: number | null
+  error: string | null
+  created_at: string
+}
+
 export type UserRole = 'viewer' | 'member' | 'admin' | 'owner'
 
 export const ROLE_RANK: Record<UserRole, number> = {

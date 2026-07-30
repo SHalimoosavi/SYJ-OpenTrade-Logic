@@ -6,3 +6,4 @@ data/hts_full.json
 .venv/
 venv/
 *.egg-info/
+.env.docker

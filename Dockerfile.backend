@@ -1,0 +1,50 @@
+# SYJ OpenTrade Logic - Backend Dockerfile
+# ===========================================
+# Builds the FastAPI backend as a container. This is meant for deploying
+# to a real Linux host (a VPS, cloud VM, Kubernetes, etc.) -- NOT for
+# running locally on Termux/Android, whose kernel typically lacks the
+# namespace/cgroup support Docker needs. The native pip-based workflow
+# documented in the main README remains the way to run this on-device.
+#
+# Build:  docker build -f Dockerfile.backend -t syj-opentrade-backend .
+# Run:    docker run -p 8000:8000 -v syj-data:/app/data syj-opentrade-backend
+
+FROM python:3.12-slim AS base
+
+# Prevents Python from writing .pyc files and buffering stdout -- makes
+# container logs show up immediately rather than being buffered.
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+
+WORKDIR /app
+
+# Install dependencies first, separately from application code, so Docker's
+# layer cache means `docker build` doesn't reinstall everything just because
+# a .py file changed -- only when requirements.txt itself changes.
+COPY server_fastapi/requirements.txt ./server_fastapi/requirements.txt
+RUN pip install --no-cache-dir -r server_fastapi/requirements.txt
+
+# Now copy the actual application code.
+COPY core/ ./core/
+COPY server_fastapi/ ./server_fastapi/
+COPY data/ ./data/
+COPY scripts/ ./scripts/
+COPY docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh
+
+# Run as a non-root user -- standard container security practice, avoids
+# running the app with more privilege than it needs.
+RUN useradd --create-home --shell /bin/bash appuser \
+    && mkdir -p /app/data \
+    && chown -R appuser:appuser /app
+USER appuser
+
+EXPOSE 8000
+
+# Lets Docker/orchestrators (docker-compose, Kubernetes) know when the
+# container is actually ready to serve traffic, not just "started".
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD python3 -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)" || exit 1
+
+ENTRYPOINT ["/app/docker-entrypoint.sh"]

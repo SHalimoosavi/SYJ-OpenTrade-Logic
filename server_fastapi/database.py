@@ -120,6 +120,52 @@ class ClassificationRecord(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
+class AuditLog(Base):
+    """
+    Append-only audit trail. Never updated or deleted once written -- that's
+    the whole point of an audit log. Scoped to organization_id so each org
+    only ever sees its own history.
+    """
+    __tablename__ = "audit_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), nullable=False)
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    user_email: Mapped[str | None] = mapped_column(String(255), nullable=True)  # denormalized snapshot at time of action
+    action: Mapped[str] = mapped_column(String(100), nullable=False)  # e.g. "product.created", "member.role_changed"
+    resource_type: Mapped[str] = mapped_column(String(50), nullable=False)  # e.g. "product", "user", "classification"
+    resource_id: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    details_json: Mapped[str | None] = mapped_column(Text, nullable=True)  # arbitrary JSON blob of what changed
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class Webhook(Base):
+    __tablename__ = "webhooks"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), nullable=False)
+    url: Mapped[str] = mapped_column(String(500), nullable=False)
+    secret: Mapped[str] = mapped_column(String(100), nullable=False)  # for HMAC-SHA256 payload signing
+    event_types: Mapped[str] = mapped_column(Text, nullable=False)  # JSON array, e.g. ["product.created", "classification.created"]
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class WebhookDelivery(Base):
+    """Log of every delivery attempt -- lets an org debug why a webhook
+    didn't fire or what payload was actually sent, without needing external
+    tooling."""
+    __tablename__ = "webhook_deliveries"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    webhook_id: Mapped[int] = mapped_column(ForeignKey("webhooks.id"), nullable=False)
+    event_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    payload_json: Mapped[str] = mapped_column(Text, nullable=False)
+    response_status: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
 def init_db():
     Base.metadata.create_all(bind=engine)
 

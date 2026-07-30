@@ -26,6 +26,8 @@ from server_fastapi.schemas import (
     ImportRowResult,
 )
 from server_fastapi.catalog_import import parse_upload, ImportParseError
+from server_fastapi.audit import log_action
+from server_fastapi.webhook_triggers import trigger_webhooks
 
 router = APIRouter(prefix="/products", tags=["catalog"])
 
@@ -75,6 +77,15 @@ def create_product(
 
     product = Product(organization_id=current_user.organization_id, **req.model_dump())
     db.add(product)
+    db.flush()
+    log_action(
+        db, current_user.organization_id, current_user,
+        action="product.created", resource_type="product", resource_id=product.id,
+        details={"sku": product.sku, "name": product.name},
+    )
+    trigger_webhooks(db, current_user.organization_id, "product.created", {
+        "id": product.id, "sku": product.sku, "name": product.name, "hts_code": product.hts_code,
+    })
     db.commit()
     db.refresh(product)
     return product
@@ -98,6 +109,15 @@ def update_product(
     updates = req.model_dump(exclude_unset=True)
     for field, value in updates.items():
         setattr(product, field, value)
+
+    log_action(
+        db, current_user.organization_id, current_user,
+        action="product.updated", resource_type="product", resource_id=product.id,
+        details={"sku": product.sku, "updated_fields": list(updates.keys())},
+    )
+    trigger_webhooks(db, current_user.organization_id, "product.updated", {
+        "id": product.id, "sku": product.sku, "name": product.name,
+    })
     db.commit()
     db.refresh(product)
     return product
@@ -116,6 +136,14 @@ def delete_product(
     )
     if product is None:
         raise HTTPException(status_code=404, detail=f"No product with id {product_id}")
+
+    sku_snapshot = product.sku
+    log_action(
+        db, current_user.organization_id, current_user,
+        action="product.deleted", resource_type="product", resource_id=product_id,
+        details={"sku": sku_snapshot},
+    )
+    trigger_webhooks(db, current_user.organization_id, "product.deleted", {"id": product_id, "sku": sku_snapshot})
     db.delete(product)
     db.commit()
     return {"deleted": True, "id": product_id}
@@ -171,6 +199,13 @@ async def import_products(
             row_results.append(ImportRowResult(
                 row_number=row["row_number"], sku=product_data.get("sku"), status="error", error=str(e.orig)
             ))
+
+    log_action(
+        db, current_user.organization_id, current_user,
+        action="product.bulk_import", resource_type="product",
+        details={"filename": file.filename, "total_rows": len(parsed_rows), "created": created, "updated": updated, "errors": errors},
+    )
+    db.commit()
 
     return ImportSummaryOut(
         total_rows=len(parsed_rows),

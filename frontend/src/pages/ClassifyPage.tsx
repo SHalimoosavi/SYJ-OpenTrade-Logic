@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { Search, Loader2, CheckCircle2, XCircle, ChevronRight, Scale } from 'lucide-react'
+import { Search, Loader2, CheckCircle2, XCircle, ChevronRight, Scale, FileDown } from 'lucide-react'
 import { classifyApi } from '@/lib/classify-api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { reportsApi } from '@/lib/reports-api'
 import { Badge } from '@/components/ui/badge'
 import type { ClassificationResult } from '@/types/api'
 
@@ -67,11 +68,18 @@ export function ClassifyPage() {
                 <p className="mt-1 text-sm text-muted-foreground">{result.final_description ?? result.unresolved_reason}</p>
               </div>
               {result.is_classified && (
-                <div className="text-right">
-                  <p className="text-xs text-muted-foreground">Confidence</p>
-                  <p className="font-mono text-lg font-semibold text-primary">
-                    {Math.round(result.confidence * 100)}%
-                  </p>
+                <div className="flex items-center gap-3">
+                  <div className="text-right">
+                    <p className="text-xs text-muted-foreground">Confidence</p>
+                    <p className="font-mono text-lg font-semibold text-primary">
+                      {Math.round(result.confidence * 100)}%
+                    </p>
+                  </div>
+                  {result.id && (
+                    <Button variant="outline" size="icon" onClick={() => reportsApi.downloadClassificationPdf(result.id!)}>
+                      <FileDown className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
               )}
             </div>

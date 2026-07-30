@@ -8,6 +8,8 @@ organization. Every catalog/org endpoint is scoped to request.user's
 organization_id -- there is no cross-tenant data access path.
 """
 
+from typing import Optional
+
 from fastapi import Depends, Header, HTTPException
 from sqlalchemy.orm import Session
 
@@ -32,6 +34,28 @@ def get_current_user(
     if user is None or not user.is_active:
         raise HTTPException(status_code=401, detail="User not found or inactive")
 
+    return user
+
+
+def get_current_user_optional(
+    authorization: str = Header(default=None),
+    db: Session = Depends(get_db),
+) -> Optional[User]:
+    """Same as get_current_user, but returns None instead of 401ing when no
+    (or an invalid) token is present. Used by endpoints like /classify that
+    are usable anonymously, but should attach organization context when the
+    caller happens to be authenticated -- e.g. so audit logs, webhooks, and
+    org-scoped reports have real data to work with."""
+    if not authorization or not authorization.startswith("Bearer "):
+        return None
+    token = authorization[len("Bearer "):]
+    try:
+        payload = decode_token(token, expected_type="access")
+    except TokenError:
+        return None
+    user = db.query(User).filter(User.id == int(payload["sub"])).first()
+    if user is None or not user.is_active:
+        return None
     return user
 
 

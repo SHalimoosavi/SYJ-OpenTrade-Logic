@@ -1,0 +1,145 @@
+name: CI
+
+# This workflow runs on GitHub's own Linux servers -- unlike everything
+# built in the development sandbox for this project (which has no network
+# access) or on Termux (which can't run Docker), this is genuine, complete
+# verification: real npm install, real Vite production build, real Docker
+# builds, all on a real Linux environment.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install -r server_fastapi/requirements.txt
+          pip install -r server_fastapi/requirements-dev.txt
+
+      # Non-FastAPI-app test modules can run together in one process safely.
+      - name: Core engine + stdlib API tests
+        run: python3 -m unittest tests.test_gri_engine tests.test_api tests.test_importer_and_terse_headings tests.test_rulings_search tests.test_duty_calculator -v
+
+      - name: Standalone server module tests (security, imports, webhooks, reports)
+        run: python3 -m unittest server_fastapi.test_security server_fastapi.test_catalog_import server_fastapi.test_webhooks server_fastapi.test_reports -v
+
+      # Each of these instantiates a real FastAPI app + SQLAlchemy engine.
+      # They MUST run as separate steps/processes -- combining them in one
+      # `unittest` invocation causes the second module's database URL
+      # override to be silently ignored, since SQLAlchemy's engine is
+      # created once at module import time and Python caches the import.
+      # (This is a real bug found and fixed during development -- see
+      # commit history around v0.4.0 for the full story.)
+      - name: FastAPI classify endpoint tests
+        run: python3 -m unittest server_fastapi.test_main -v
+
+      - name: Auth, RBAC, and catalog integration tests
+        run: python3 -m unittest server_fastapi.test_auth_and_catalog -v
+
+      - name: Rulings search API tests
+        run: python3 -m unittest server_fastapi.test_rulings_api -v
+
+      - name: Duty calculator API tests
+        run: python3 -m unittest server_fastapi.test_duty_api -v
+
+      - name: v0.8.0 feature tests (audit, webhooks, reports)
+        run: python3 -m unittest server_fastapi.test_v080_features -v
+
+  frontend-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # Using 'npm install' rather than 'npm ci': the latter requires an
+      # exact, committed package-lock.json or it hard-fails. If you do have
+      # one committed (recommended -- run `npm install` locally once and
+      # commit the generated lockfile), feel free to switch this to
+      # 'npm ci' for faster, more reproducible CI runs.
+      - name: Install dependencies
+        run: npm install
+
+      # package.json's "build" script is "tsc -b && vite build" -- so this
+      # single step both type-checks (tsc -b respects tsconfig's noEmit)
+      # and produces the real production bundle. A separate type-check
+      # step would be redundant and risks CLI flag conflicts with
+      # TypeScript's project-references build mode.
+      - name: Type-check and production build
+        run: npm run build
+        env:
+          VITE_API_BASE_URL: http://localhost:8000
+
+  docker-build:
+    runs-on: ubuntu-latest
+    needs: [backend-tests, frontend-build]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build backend image
+        run: docker build -f Dockerfile.backend -t syj-opentrade-backend:ci .
+
+      - name: Build frontend image
+        run: docker build -f Dockerfile.frontend -t syj-opentrade-frontend:ci .
+
+      - name: Sanity-check backend image actually starts
+        run: |
+          docker run -d --name backend-smoke-test \
+            -e SYJ_SECRET_KEY=ci-smoke-test-secret-not-for-production \
+            -p 8000:8000 \
+            syj-opentrade-backend:ci
+          echo "Waiting for backend to become healthy..."
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8000/health > /dev/null; then
+              echo "Backend responded healthy after ${i}s"
+              curl -s http://localhost:8000/health
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Backend did not become healthy in time"
+          docker logs backend-smoke-test
+          exit 1
+
+      - name: Sanity-check frontend image actually serves content
+        run: |
+          docker run -d --name frontend-smoke-test -p 8080:80 syj-opentrade-frontend:ci
+          sleep 3
+          # Confirms nginx.conf is valid AND actually serving the built app --
+          # this is the only place in the whole project that can verify
+          # nginx.conf syntax for real, since nginx isn't installed in the
+          # dev sandbox this project was built in.
+          if curl -sf http://localhost:8080/ | grep -q "SYJ OpenTrade Logic"; then
+            echo "Frontend served the real index.html successfully"
+          else
+            echo "Frontend did not serve expected content"
+            docker logs frontend-smoke-test
+            exit 1
+          fi
+          # Also confirms the SPA fallback route works -- a request to a
+          # client-side-routed path like /classify should still return
+          # index.html (200), not nginx's default 404.
+          if curl -sf http://localhost:8080/classify | grep -q "SYJ OpenTrade Logic"; then
+            echo "SPA fallback routing works correctly"
+          else
+            echo "SPA fallback routing is broken -- /classify did not return index.html"
+            exit 1
+          fi

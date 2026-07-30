@@ -4,11 +4,11 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { AxiosError } from 'axios'
-import { Plus, Upload, Trash2, Pencil, Loader2, Package } from 'lucide-react'
+import { Plus, Upload, Download, Trash2, Pencil, Loader2, Package } from 'lucide-react'
+import { reportsApi } from '@/lib/reports-api'
 import { productsApi } from '@/lib/products-api'
 import { useAuth } from '@/lib/auth-context'
-import { roleAtLeast } from '@/types/api'
-import type { Product, ImportSummary } from '@/types/api'
+import { roleAtLeast, type Product, type ImportSummary } from '@/types/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -141,6 +141,14 @@ export function ProductsPage() {
                 <Upload className="mr-2 h-4 w-4" />
               )}
               Import CSV/Excel
+            </Button>
+            <Button variant="outline" onClick={() => reportsApi.downloadProductsCsv()}>
+              <Download className="mr-2 h-4 w-4" />
+              Export CSV
+            </Button>
+            <Button variant="outline" onClick={() => reportsApi.downloadProductsExcel()}>
+              <Download className="mr-2 h-4 w-4" />
+              Export Excel
             </Button>
             <Button onClick={openCreateDialog}>
               <Plus className="mr-2 h-4 w-4" />

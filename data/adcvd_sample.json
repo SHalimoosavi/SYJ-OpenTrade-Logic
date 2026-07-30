@@ -1,0 +1,28 @@
+{
+  "as_of_date": "2026-07-26",
+  "disclaimer": "This is a small, manually-curated sample of well-known AD/CVD orders for demonstration and awareness-flagging purposes ONLY. It is NOT comprehensive -- Commerce/USITC maintain hundreds of active AD/CVD orders, and cash deposit rates vary by specific manufacturer/exporter, not just by product and country. A 'flag' from this tool means 'check the official CBP ADCVD database before importing' -- it is never a determination that duties do or do not apply. Always verify against the official source below or consult a licensed customs broker.",
+  "official_source": "https://trade.cbp.dhs.gov/ace/adcvd/adcvd-public/",
+  "orders": [
+    {
+      "case_numbers": ["A-570-967", "C-570-968"],
+      "product_scope": "Aluminum extrusions",
+      "countries": ["CN"],
+      "hts_prefixes": ["7604", "7608", "7609"],
+      "notes": "Cash deposit rates vary significantly by named exporter/manufacturer -- check the official CBP ADCVD database for the applicable rate for your specific supplier."
+    },
+    {
+      "case_numbers": ["A-570-601", "C-570-602"],
+      "product_scope": "Certain steel nails",
+      "countries": ["CN"],
+      "hts_prefixes": ["7317"],
+      "notes": "Cash deposit rates vary by named exporter/manufacturer."
+    },
+    {
+      "case_numbers": ["A-570-979", "C-570-980"],
+      "product_scope": "Crystalline silicon photovoltaic cells (solar cells), whether or not assembled into modules",
+      "countries": ["CN"],
+      "hts_prefixes": ["8541"],
+      "notes": "Cash deposit rates vary by named exporter/manufacturer; scope has been subject to circumvention inquiries covering third-country assembly."
+    }
+  ]
+}

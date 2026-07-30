@@ -9,6 +9,9 @@ import { DashboardHome } from '@/pages/DashboardHome'
 import { ClassifyPage } from '@/pages/ClassifyPage'
 import { ProductsPage } from '@/pages/ProductsPage'
 import { MembersPage } from '@/pages/MembersPage'
+import { DutyCalculatorPage } from '@/pages/DutyCalculatorPage'
+import { AuditLogPage } from '@/pages/AuditLogPage'
+import { WebhooksPage } from '@/pages/WebhooksPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -50,8 +53,11 @@ function AppRoutes() {
         <Route element={<DashboardLayout />}>
           <Route path="/" element={<DashboardHome />} />
           <Route path="/classify" element={<ClassifyPage />} />
+          <Route path="/duty-calculator" element={<DutyCalculatorPage />} />
           <Route path="/products" element={<ProductsPage />} />
           <Route path="/members" element={<MembersPage />} />
+          <Route path="/audit-log" element={<AuditLogPage />} />
+          <Route path="/webhooks" element={<WebhooksPage />} />
         </Route>
       </Route>
 

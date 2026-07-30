@@ -15,6 +15,7 @@ from server_fastapi.database import get_db, User, UserRole
 from server_fastapi.dependencies import require_role
 from server_fastapi.security import hash_password
 from server_fastapi.schemas import InviteUserRequest, UpdateUserRoleRequest, UserOut
+from server_fastapi.audit import log_action
 
 router = APIRouter(prefix="/organizations/members", tags=["organizations"])
 
@@ -55,6 +56,12 @@ def invite_member(
         is_active=True,
     )
     db.add(new_user)
+    db.flush()
+    log_action(
+        db, current_user.organization_id, current_user,
+        action="member.invited", resource_type="user", resource_id=new_user.id,
+        details={"email": req.email, "role": req.role},
+    )
     db.commit()
     db.refresh(new_user)
     return new_user
@@ -83,7 +90,13 @@ def update_member_role(
     if member.id == current_user.id and new_role != UserRole.OWNER and current_user.role == UserRole.OWNER:
         raise HTTPException(status_code=400, detail="An owner cannot demote themselves; transfer ownership to another user first")
 
+    old_role = member.role
     member.role = new_role
+    log_action(
+        db, current_user.organization_id, current_user,
+        action="member.role_changed", resource_type="user", resource_id=member.id,
+        details={"email": member.email, "old_role": str(old_role), "new_role": req.role},
+    )
     db.commit()
     db.refresh(member)
     return member

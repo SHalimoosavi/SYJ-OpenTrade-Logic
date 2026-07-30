@@ -211,3 +211,107 @@ class RulingsSearchResponse(BaseModel):
     query: str
     count: int
     results: List[RulingOut]
+
+
+# ---------------------------------------------------------------------------
+# v0.7.0 - Duty Calculator (Section 301/232/IEEPA + AD/CVD flagging)
+# ---------------------------------------------------------------------------
+
+class DutyCalculateRequest(BaseModel):
+    hts_code: str = Field(..., min_length=1, description="Full HTS code, e.g. 8467.21.00.10")
+    country_of_origin: str = Field(..., min_length=2, max_length=2, description="2-letter ISO country code, e.g. CN")
+    declared_value: float = Field(..., gt=0, description="Declared customs value in USD")
+    general_duty_rate: Optional[str] = Field(
+        None, description="Base HTS duty rate string, e.g. '1.7%' or 'Free'. If omitted and hts_code matches a known code, may be looked up automatically."
+    )
+
+
+class ProgramDutyOut(BaseModel):
+    program: str
+    chapter99_code: str
+    legal_basis: str
+    rate: float
+    amount: float
+    notes: str
+    source_url: str
+
+
+class ADCVDFlagOut(BaseModel):
+    case_numbers: List[str]
+    product_scope: str
+    countries: List[str]
+    notes: str
+
+
+class DutyCalculationOut(BaseModel):
+    hts_code: str
+    country_of_origin: str
+    declared_value: float
+    base_duty_rate: Optional[float]
+    base_duty_amount: Optional[float]
+    base_rate_raw: Optional[str]
+    program_duties: List[ProgramDutyOut]
+    adcvd_flags: List[ADCVDFlagOut]
+    total_duty_rate: Optional[float]
+    total_duty_amount: Optional[float]
+    warnings: List[str]
+    as_of_date: str
+    disclaimer: str
+
+
+# ---------------------------------------------------------------------------
+# v0.8.0 - Audit Trails, Webhooks, Reports
+# ---------------------------------------------------------------------------
+
+class AuditLogOut(BaseModel):
+    id: int
+    user_email: Optional[str]
+    action: str
+    resource_type: str
+    resource_id: Optional[str]
+    details: Optional[dict] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class AuditLogListOut(BaseModel):
+    count: int
+    limit: int
+    offset: int
+    results: List[AuditLogOut]
+
+
+class WebhookCreateRequest(BaseModel):
+    url: str = Field(..., min_length=8, max_length=500)
+    event_types: List[str] = Field(..., min_length=1)
+
+
+class WebhookOut(BaseModel):
+    id: int
+    url: str
+    event_types: List[str]
+    is_active: bool
+    created_at: datetime
+    secret: Optional[str] = None  # only returned once, at creation time
+
+
+class WebhookListOut(BaseModel):
+    results: List[WebhookOut]
+
+
+class WebhookDeliveryOut(BaseModel):
+    id: int
+    webhook_id: int
+    event_type: str
+    response_status: Optional[int]
+    error: Optional[str]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class WebhookTestRequest(BaseModel):
+    event_type: str = "webhook.test"

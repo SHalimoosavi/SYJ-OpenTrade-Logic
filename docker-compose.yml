@@ -1,0 +1,54 @@
+version: "3.8"
+
+# SYJ OpenTrade Logic - Docker Compose
+# ======================================
+# Brings up the full stack: FastAPI backend + Vite/React dashboard served
+# by nginx. Meant for a real Linux host (VPS, cloud VM) -- see
+# DEPLOYMENT.md for the reasoning on why this isn't the Termux workflow.
+#
+# Quick start:
+#   cp .env.docker.example .env.docker
+#   # edit .env.docker -- SYJ_SECRET_KEY especially, see DEPLOYMENT.md
+#   docker compose --env-file .env.docker up --build
+#
+# First startup will take longer than usual: the backend's entrypoint
+# script builds the full HTS dataset from the live USITC API on first run
+# (see docker-entrypoint.sh), which needs real internet access and takes
+# 10-60 seconds depending on connection speed.
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    ports:
+      - "8000:8000"
+    environment:
+      SYJ_SECRET_KEY: ${SYJ_SECRET_KEY:?SYJ_SECRET_KEY must be set -- see DEPLOYMENT.md}
+      SYJ_DATABASE_URL: ${SYJ_DATABASE_URL:-sqlite:////app/data/syj_opentrade.db}
+    volumes:
+      # Persists the SQLite DB and the built HTS dataset across container
+      # restarts/rebuilds -- without this, both would be rebuilt from
+      # scratch (losing all data) every time the container recreates.
+      - syj-data:/app/data
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s  # generous, since first run also builds the HTS dataset
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        VITE_API_BASE_URL: ${SYJ_PUBLIC_API_URL:-http://localhost:8000}
+    ports:
+      - "8080:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  syj-data:

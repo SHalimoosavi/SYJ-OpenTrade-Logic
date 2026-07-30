@@ -19,6 +19,8 @@ import json
 import os
 import sys
 
+from typing import Optional
+
 from fastapi import FastAPI, HTTPException, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -26,7 +28,7 @@ from sqlalchemy.orm import Session
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.gri_engine import GRIEngine  # noqa: E402
-from server_fastapi.database import init_db, get_db, ClassificationRecord  # noqa: E402
+from server_fastapi.database import init_db, get_db, ClassificationRecord, User  # noqa: E402
 from server_fastapi.schemas import (  # noqa: E402
     ClassifyRequest,
     ClassificationOut,
@@ -35,7 +37,11 @@ from server_fastapi.schemas import (  # noqa: E402
     DeleteOut,
     HealthOut,
 )
-from server_fastapi import routes_auth, routes_catalog, routes_org, routes_rulings  # noqa: E402
+from server_fastapi import routes_auth, routes_catalog, routes_org, routes_rulings, routes_duty  # noqa: E402
+from server_fastapi import routes_webhooks, routes_audit, routes_reports  # noqa: E402
+from server_fastapi.dependencies import get_current_user_optional  # noqa: E402
+from server_fastapi.audit import log_action  # noqa: E402
+from server_fastapi.webhook_triggers import trigger_webhooks  # noqa: E402
 
 DEFAULT_HTS_DATA = os.environ.get(
     "SYJ_HTS_DATA_PATH",
@@ -47,7 +53,7 @@ FALLBACK_HTS_DATA = os.path.join(
 
 app = FastAPI(
     title="SYJ OpenTrade Logic API",
-    version="0.4.0",
+    version="0.7.0",
     description="Deterministic, explainable HTS classification REST API with organizations, RBAC, and a product catalog.",
 )
 
@@ -62,6 +68,10 @@ app.include_router(routes_auth.router)
 app.include_router(routes_catalog.router)
 app.include_router(routes_org.router)
 app.include_router(routes_rulings.router)
+app.include_router(routes_duty.router)
+app.include_router(routes_webhooks.router)
+app.include_router(routes_audit.router)
+app.include_router(routes_reports.router)
 
 # Load the full 99-chapter dataset if it exists (built by scripts/import_hts_data.py);
 # fall back to the small demo dataset from v0.1.0/v0.2.0 otherwise, so the server
@@ -81,11 +91,15 @@ def on_startup():
 
 @app.get("/health", response_model=HealthOut)
 def health():
-    return {"status": "ok", "service": "SYJ OpenTrade Logic", "version": "0.4.0"}
+    return {"status": "ok", "service": "SYJ OpenTrade Logic", "version": "0.7.0"}
 
 
 @app.post("/classify", response_model=ClassificationOut, status_code=201)
-def classify(req: ClassifyRequest, db: Session = Depends(get_db)):
+def classify(
+    req: ClassifyRequest,
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional),
+):
     result = engine.classify(req.description)
     result_dict = result.to_dict()
 
@@ -122,7 +136,15 @@ def classify(req: ClassifyRequest, db: Session = Depends(get_db)):
             )
     result_dict["related_rulings"] = related_rulings[:3]
 
+    # v0.8.0: if the caller happens to be authenticated, scope this
+    # classification to their organization -- this is what makes org-scoped
+    # reports/audit trails/webhooks have real data to work with, while
+    # keeping /classify fully usable anonymously (organization_id stays
+    # NULL for anonymous calls, same as before).
+    organization_id = current_user.organization_id if current_user else None
+
     record = ClassificationRecord(
+        organization_id=organization_id,
         product_description=result_dict["product_description"],
         final_code=result_dict.get("final_code"),
         final_description=result_dict.get("final_description"),
@@ -133,6 +155,19 @@ def classify(req: ClassifyRequest, db: Session = Depends(get_db)):
         result_json=json.dumps(result_dict),
     )
     db.add(record)
+
+    if organization_id:
+        log_action(
+            db, organization_id, current_user,
+            action="classification.created", resource_type="classification",
+            details={"product_description": req.description, "final_code": result_dict.get("final_code")},
+        )
+        trigger_webhooks(db, organization_id, "classification.created", {
+            "product_description": req.description,
+            "final_code": result_dict.get("final_code"),
+            "is_classified": result_dict.get("is_classified"),
+        })
+
     db.commit()
     db.refresh(record)
 
