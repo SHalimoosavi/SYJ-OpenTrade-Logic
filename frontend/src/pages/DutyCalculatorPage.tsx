@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -32,6 +33,9 @@ function formatPercent(n: number | null) {
 }
 
 export function DutyCalculatorPage() {
+  const location = useLocation()
+  const handoff = (location.state as { hts_code?: string; general_duty_rate?: string } | null) ?? null
+
   const [result, setResult] = useState<DutyCalculationResult | null>(null)
   const [serverError, setServerError] = useState<string | null>(null)
 
@@ -39,7 +43,13 @@ export function DutyCalculatorPage() {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm<FormValues>({ resolver: zodResolver(schema) })
+  } = useForm<FormValues>({
+    resolver: zodResolver(schema),
+    defaultValues: {
+      hts_code: handoff?.hts_code ?? '',
+      general_duty_rate: handoff?.general_duty_rate ?? '',
+    },
+  })
 
   const mutation = useMutation({
     mutationFn: dutyApi.calculate,
@@ -67,6 +77,12 @@ export function DutyCalculatorPage() {
           Estimate total duty for an HTS code, including applicable Section 301/232 trade remedies and AD/CVD scope flags.
         </p>
       </div>
+
+      {handoff?.hts_code && (
+        <div className="rounded-md border border-primary/30 bg-primary/5 px-4 py-2 text-sm text-muted-foreground">
+          Pre-filled from your classification of <span className="font-mono text-foreground">{handoff.hts_code}</span> — just add the country of origin and declared value.
+        </div>
+      )}
 
       <div className="flex items-start gap-3 rounded-md border border-destructive/30 bg-destructive/10 p-4 text-sm">
         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />

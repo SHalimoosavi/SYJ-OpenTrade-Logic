@@ -1,6 +1,7 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { Search, Loader2, CheckCircle2, XCircle, ChevronRight, Scale, FileDown } from 'lucide-react'
+import { Search, Loader2, CheckCircle2, XCircle, ChevronRight, Scale, FileDown, Calculator } from 'lucide-react'
 import { classifyApi } from '@/lib/classify-api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -10,6 +11,7 @@ import { Badge } from '@/components/ui/badge'
 import type { ClassificationResult } from '@/types/api'
 
 export function ClassifyPage() {
+  const navigate = useNavigate()
   const [description, setDescription] = useState('')
   const [result, setResult] = useState<ClassificationResult | null>(null)
 
@@ -75,6 +77,18 @@ export function ClassifyPage() {
                       {Math.round(result.confidence * 100)}%
                     </p>
                   </div>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    title="Calculate duty for this classification"
+                    onClick={() =>
+                      navigate('/duty-calculator', {
+                        state: { hts_code: result.final_code, general_duty_rate: result.duty_rate },
+                      })
+                    }
+                  >
+                    <Calculator className="h-4 w-4" />
+                  </Button>
                   {result.id && (
                     <Button variant="outline" size="icon" onClick={() => reportsApi.downloadClassificationPdf(result.id!)}>
                       <FileDown className="h-4 w-4" />
