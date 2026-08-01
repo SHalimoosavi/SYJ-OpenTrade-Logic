@@ -222,7 +222,7 @@ class DutyCalculateRequest(BaseModel):
     country_of_origin: str = Field(..., min_length=2, max_length=2, description="2-letter ISO country code, e.g. CN")
     declared_value: float = Field(..., gt=0, description="Declared customs value in USD")
     general_duty_rate: Optional[str] = Field(
-        None, description="Base HTS duty rate string, e.g. '1.7%' or 'Free'. If omitted and hts_code matches a known code, may be looked up automatically."
+        None, description="Base HTS duty rate string, e.g. '1.7%' or 'Free'. If omitted, base duty is not calculated and a warning is returned instead -- there is currently no automatic lookup of the rate from the HTS code alone."
     )
 
 
