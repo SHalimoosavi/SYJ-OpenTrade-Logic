@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { AxiosError } from 'axios'
 import { Plus, Loader2, Webhook as WebhookIcon, Trash2, Zap, Copy, Check } from 'lucide-react'
 import { webhooksApi } from '@/lib/webhooks-api'
+import { useToast } from '@/hooks/use-toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -31,6 +32,7 @@ type FormValues = z.infer<typeof schema>
 
 export function WebhooksPage() {
   const queryClient = useQueryClient()
+  const { toast } = useToast()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [newSecret, setNewSecret] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
@@ -52,16 +54,27 @@ export function WebhooksPage() {
       queryClient.invalidateQueries({ queryKey: ['webhooks'] })
       setNewSecret(webhook.secret ?? null)
       reset({ url: '', event_types: [] })
+      toast({ title: 'Webhook created' })
     },
   })
 
   const deleteMutation = useMutation({
     mutationFn: webhooksApi.remove,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['webhooks'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['webhooks'] })
+      toast({ title: 'Webhook removed' })
+    },
   })
 
   const testMutation = useMutation({
     mutationFn: webhooksApi.test,
+    onSuccess: (result) => {
+      toast({
+        title: result.success ? 'Test delivery succeeded' : 'Test delivery failed',
+        description: result.status_code ? `Responded with ${result.status_code}` : result.error ?? undefined,
+        variant: result.success ? 'success' : 'destructive',
+      })
+    },
   })
 
   async function onSubmit(values: FormValues) {

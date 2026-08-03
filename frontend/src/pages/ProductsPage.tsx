@@ -4,15 +4,17 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { AxiosError } from 'axios'
-import { Plus, Upload, Download, Trash2, Pencil, Loader2, Package } from 'lucide-react'
+import { Plus, Upload, Download, Trash2, Pencil, Loader2, Package, ChevronLeft, ChevronRight } from 'lucide-react'
 import { reportsApi } from '@/lib/reports-api'
 import { productsApi } from '@/lib/products-api'
 import { useAuth } from '@/lib/auth-context'
+import { useToast } from '@/hooks/use-toast'
 import { roleAtLeast, type Product, type ImportSummary } from '@/types/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import {
   Dialog,
@@ -23,6 +25,8 @@ import {
   DialogFooter,
   DialogClose,
 } from '@/components/ui/dialog'
+
+const PAGE_SIZE = 20
 
 const productSchema = z.object({
   sku: z.string().min(1, 'SKU is required'),
@@ -36,8 +40,10 @@ type ProductFormValues = z.infer<typeof productSchema>
 export function ProductsPage() {
   const { user } = useAuth()
   const queryClient = useQueryClient()
+  const { toast } = useToast()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  const [page, setPage] = useState(0)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [importSummary, setImportSummary] = useState<ImportSummary | null>(null)
@@ -46,7 +52,12 @@ export function ProductsPage() {
   const canWrite = user ? roleAtLeast(user.role, 'member') : false
   const canDelete = user ? roleAtLeast(user.role, 'admin') : false
 
-  const { data, isLoading } = useQuery({ queryKey: ['products'], queryFn: () => productsApi.list(100, 0) })
+  const { data, isLoading } = useQuery({
+    queryKey: ['products', page],
+    queryFn: () => productsApi.list(PAGE_SIZE, page * PAGE_SIZE),
+  })
+
+  const totalPages = data ? Math.max(1, Math.ceil(data.count / PAGE_SIZE)) : 1
 
   const {
     register,
@@ -57,23 +68,31 @@ export function ProductsPage() {
 
   const createMutation = useMutation({
     mutationFn: productsApi.create,
-    onSuccess: () => {
+    onSuccess: (product) => {
       queryClient.invalidateQueries({ queryKey: ['products'] })
       setDialogOpen(false)
+      toast({ title: 'Product added', description: `${product.sku} — ${product.name}` })
     },
   })
 
   const updateMutation = useMutation({
     mutationFn: ({ id, payload }: { id: number; payload: ProductFormValues }) => productsApi.update(id, payload),
-    onSuccess: () => {
+    onSuccess: (product) => {
       queryClient.invalidateQueries({ queryKey: ['products'] })
       setDialogOpen(false)
+      toast({ title: 'Product updated', description: `${product.sku} — ${product.name}` })
     },
   })
 
   const deleteMutation = useMutation({
     mutationFn: productsApi.remove,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['products'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products'] })
+      toast({ title: 'Product deleted' })
+    },
+    onError: () => {
+      toast({ variant: 'destructive', title: 'Could not delete product' })
+    },
   })
 
   const importMutation = useMutation({
@@ -81,6 +100,14 @@ export function ProductsPage() {
     onSuccess: (summary) => {
       setImportSummary(summary)
       queryClient.invalidateQueries({ queryKey: ['products'] })
+      toast({
+        title: 'Import complete',
+        description: `${summary.created} created, ${summary.updated} updated, ${summary.errors} errors`,
+        variant: summary.errors > 0 ? 'destructive' : 'success',
+      })
+    },
+    onError: () => {
+      toast({ variant: 'destructive', title: 'Import failed', description: 'Check the file format and try again.' })
     },
   })
 
@@ -126,31 +153,31 @@ export function ProductsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Product catalog</h1>
           <p className="text-sm text-muted-foreground">{data?.count ?? 0} products in your organization.</p>
         </div>
         {canWrite && (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <input ref={fileInputRef} type="file" accept=".csv,.xlsx" className="hidden" onChange={handleFileSelected} />
-            <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={importMutation.isPending}>
+            <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={importMutation.isPending}>
               {importMutation.isPending ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
                 <Upload className="mr-2 h-4 w-4" />
               )}
-              Import CSV/Excel
+              Import
             </Button>
-            <Button variant="outline" onClick={() => reportsApi.downloadProductsCsv()}>
+            <Button variant="outline" size="sm" onClick={() => reportsApi.downloadProductsCsv()}>
               <Download className="mr-2 h-4 w-4" />
-              Export CSV
+              CSV
             </Button>
-            <Button variant="outline" onClick={() => reportsApi.downloadProductsExcel()}>
+            <Button variant="outline" size="sm" onClick={() => reportsApi.downloadProductsExcel()}>
               <Download className="mr-2 h-4 w-4" />
-              Export Excel
+              Excel
             </Button>
-            <Button onClick={openCreateDialog}>
+            <Button size="sm" onClick={openCreateDialog}>
               <Plus className="mr-2 h-4 w-4" />
               Add product
             </Button>
@@ -179,56 +206,81 @@ export function ProductsPage() {
       )}
 
       {isLoading ? (
-        <div className="flex justify-center py-16">
-          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        <div className="space-y-2 rounded-lg border border-border p-4">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-10 w-full" />
+          ))}
         </div>
       ) : data && data.results.length > 0 ? (
-        <div className="rounded-lg border border-border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>SKU</TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead>HTS Code</TableHead>
-                <TableHead>Duty Rate</TableHead>
-                {(canWrite || canDelete) && <TableHead className="text-right">Actions</TableHead>}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {data.results.map((product) => (
-                <TableRow key={product.id}>
-                  <TableCell className="font-mono text-sm">{product.sku}</TableCell>
-                  <TableCell>{product.name}</TableCell>
-                  <TableCell className="font-mono text-sm">
-                    {product.hts_code ? <Badge variant="outline">{product.hts_code}</Badge> : '—'}
-                  </TableCell>
-                  <TableCell className="font-mono text-sm">{product.duty_rate ?? '—'}</TableCell>
-                  {(canWrite || canDelete) && (
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        {canWrite && (
-                          <Button variant="ghost" size="icon" onClick={() => openEditDialog(product)}>
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                        )}
-                        {canDelete && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => deleteMutation.mutate(product.id)}
-                            disabled={deleteMutation.isPending}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        )}
-                      </div>
-                    </TableCell>
-                  )}
+        <>
+          <div className="rounded-lg border border-border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>SKU</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead>HTS Code</TableHead>
+                  <TableHead>Duty Rate</TableHead>
+                  {(canWrite || canDelete) && <TableHead className="text-right">Actions</TableHead>}
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+              </TableHeader>
+              <TableBody>
+                {data.results.map((product) => (
+                  <TableRow key={product.id}>
+                    <TableCell className="font-mono text-sm">{product.sku}</TableCell>
+                    <TableCell>{product.name}</TableCell>
+                    <TableCell className="font-mono text-sm">
+                      {product.hts_code ? <Badge variant="outline">{product.hts_code}</Badge> : '—'}
+                    </TableCell>
+                    <TableCell className="font-mono text-sm">{product.duty_rate ?? '—'}</TableCell>
+                    {(canWrite || canDelete) && (
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          {canWrite && (
+                            <Button variant="ghost" size="icon" onClick={() => openEditDialog(product)}>
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {canDelete && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => deleteMutation.mutate(product.id)}
+                              disabled={deleteMutation.isPending}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    )}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between text-sm text-muted-foreground">
+              <span>
+                Page {page + 1} of {totalPages}
+              </span>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                  disabled={page >= totalPages - 1}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
       ) : (
         <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-border py-16 text-center">
           <Package className="h-8 w-8 text-muted-foreground" />

@@ -7,6 +7,7 @@ import { AxiosError } from 'axios'
 import { UserPlus, Loader2, Users } from 'lucide-react'
 import { orgApi } from '@/lib/org-api'
 import { useAuth } from '@/lib/auth-context'
+import { useToast } from '@/hooks/use-toast'
 import { roleAtLeast, type UserRole } from '@/types/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -42,6 +43,7 @@ const roleBadgeVariant: Record<UserRole, 'default' | 'secondary' | 'outline'> = 
 export function MembersPage() {
   const { user } = useAuth()
   const queryClient = useQueryClient()
+  const { toast } = useToast()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
@@ -60,16 +62,23 @@ export function MembersPage() {
 
   const inviteMutation = useMutation({
     mutationFn: orgApi.inviteMember,
-    onSuccess: () => {
+    onSuccess: (member) => {
       queryClient.invalidateQueries({ queryKey: ['org-members'] })
       setDialogOpen(false)
       reset()
+      toast({ title: 'Member invited', description: `${member.email} can now sign in.` })
     },
   })
 
   const roleMutation = useMutation({
     mutationFn: ({ userId, role }: { userId: number; role: UserRole }) => orgApi.updateRole(userId, role),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['org-members'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['org-members'] })
+      toast({ title: 'Role updated' })
+    },
+    onError: () => {
+      toast({ variant: 'destructive', title: 'Could not update role' })
+    },
   })
 
   async function onSubmit(values: InviteFormValues) {
