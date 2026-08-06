@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import {
   LayoutDashboard,
@@ -19,6 +19,8 @@ import { useAuth } from '@/lib/auth-context'
 import { useTheme } from '@/lib/theme-context'
 import { cn } from '@/lib/utils'
 import { roleAtLeast } from '@/types/api'
+import { CommandPalette } from '@/components/CommandPalette'
+import { Breadcrumbs } from '@/components/Breadcrumbs'
 
 const navItems = [
   { to: '/', label: 'Overview', icon: LayoutDashboard, end: true },
@@ -34,6 +36,21 @@ export function DashboardLayout() {
   const { user, logout } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [paletteOpen, setPaletteOpen] = useState(false)
+
+  // Global Cmd+K / Ctrl+K shortcut, standard across most modern web apps
+  // (Linear, Notion, Vercel, GitHub) -- matches the "Command Palette" and
+  // "Keyboard Navigation" requirements from the original project spec.
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        setPaletteOpen((open) => !open)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   const sidebarContent = (
     <>
@@ -101,6 +118,8 @@ export function DashboardLayout() {
 
   return (
     <div className="flex h-screen bg-background">
+      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
+
       {/* Desktop sidebar -- always visible at md+ widths */}
       <aside className="hidden w-60 flex-col border-r border-border bg-card md:flex">{sidebarContent}</aside>
 
@@ -110,13 +129,22 @@ export function DashboardLayout() {
           <Terminal className="h-5 w-5 text-primary" />
           <span className="text-sm font-semibold">SYJ OpenTrade</span>
         </div>
-        <button
-          onClick={() => setMobileNavOpen(true)}
-          className="rounded-md p-2 text-muted-foreground hover:bg-secondary hover:text-foreground"
-          aria-label="Open menu"
-        >
-          <Menu className="h-5 w-5" />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setPaletteOpen(true)}
+            className="rounded-md p-2 text-muted-foreground hover:bg-secondary hover:text-foreground"
+            aria-label="Search"
+          >
+            <Search className="h-5 w-5" />
+          </button>
+          <button
+            onClick={() => setMobileNavOpen(true)}
+            className="rounded-md p-2 text-muted-foreground hover:bg-secondary hover:text-foreground"
+            aria-label="Open menu"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+        </div>
       </div>
 
       {/* Mobile slide-in nav + overlay */}
@@ -139,6 +167,19 @@ export function DashboardLayout() {
       )}
 
       <main className="flex-1 overflow-y-auto pt-14 md:pt-0">
+        {/* Desktop-only top bar: breadcrumbs + search trigger */}
+        <div className="hidden items-center justify-between border-b border-border px-8 py-3 md:flex">
+          <Breadcrumbs />
+          <button
+            onClick={() => setPaletteOpen(true)}
+            className="flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+          >
+            <Search className="h-3.5 w-3.5" />
+            Search
+            <kbd className="ml-2 rounded border border-border px-1.5 py-0.5 text-[10px]">⌘K</kbd>
+          </button>
+        </div>
+
         <div className="mx-auto max-w-6xl px-4 py-6 sm:px-8 sm:py-8">
           <Outlet />
         </div>
